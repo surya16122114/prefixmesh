@@ -10,7 +10,9 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -19,6 +21,7 @@ import (
 	"github.com/surya16122114/prefixmesh/internal/blockstore"
 	"github.com/surya16122114/prefixmesh/internal/cachenode"
 	"github.com/surya16122114/prefixmesh/internal/events"
+	"github.com/surya16122114/prefixmesh/internal/metrics"
 )
 
 func main() {
@@ -31,7 +34,9 @@ func main() {
 	dirs := flag.String("directory", "", "comma-separated directory replica addrs (empty = static M0 mode)")
 	kafka := flag.String("kafka", "", "comma-separated Kafka brokers (empty = no warm consumer)")
 	warmRate := flag.Float64("warm-rate", 200, "max warm fetches per second")
+	metricsAddr := flag.String("metrics", ":9100", "Prometheus /metrics address (empty = disabled)")
 	flag.Parse()
+	metrics.Serve(*metricsAddr)
 	if *nodeID == "" {
 		slog.Error("--node-id is required")
 		os.Exit(1)
@@ -46,6 +51,7 @@ func main() {
 	}
 
 	store := blockstore.NewPaged(*capacity, *pageBytes, policy)
+	prometheus.MustRegister(cachenode.NewStoreCollector(store))
 	srv := cachenode.New(store)
 
 	if *dirs != "" {
@@ -60,6 +66,7 @@ func main() {
 
 	if *kafka != "" {
 		warmer := cachenode.NewWarmer(*nodeID, store, *warmRate)
+		prometheus.MustRegister(cachenode.NewWarmerCollector(warmer))
 		// Group per node: every node sees every warm command and filters by
 		// target — command volume is low and this avoids partition/target
 		// alignment machinery.
@@ -70,6 +77,13 @@ func main() {
 			os.Exit(1)
 		}
 		go consumer.Run(context.Background())
+
+		producer, err := events.NewKafkaProducer(strings.Split(*kafka, ","))
+		if err != nil {
+			slog.Error("kafka telemetry producer init failed", "err", err)
+			os.Exit(1)
+		}
+		go cachenode.RunTelemetry(context.Background(), producer, *nodeID, store, 5*time.Second)
 	}
 
 	lis, err := net.Listen("tcp", *listen)

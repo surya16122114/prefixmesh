@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -20,6 +22,32 @@ import (
 	"github.com/surya16122114/prefixmesh/internal/chain"
 	"github.com/surya16122114/prefixmesh/internal/events"
 	"github.com/surya16122114/prefixmesh/internal/hashring"
+)
+
+// Prometheus metrics (DESIGN.md §7). Package-level: the process runs one
+// logical gateway even if tests construct several Servers.
+var (
+	matchSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "pm_gateway_match_seconds",
+		Help:    "Match RPC latency, gateway-side.",
+		Buckets: prometheus.ExponentialBuckets(0.0001, 2, 14), // 100µs .. ~1.6s
+	})
+	blocksRequested = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pm_gateway_blocks_requested_total",
+		Help: "Chain blocks requested across all Match calls.",
+	})
+	blocksHit = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pm_gateway_blocks_hit_total",
+		Help: "Chain blocks served from cache (within matched depth).",
+	})
+	costRequestedUS = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pm_gateway_cost_requested_us_total",
+		Help: "Simulated prefill cost requested, µs (from PutBlocks metadata).",
+	})
+	wrongEpochRetries = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pm_gateway_wrong_epoch_retries_total",
+		Help: "Match fan-outs retried after a WRONG_EPOCH rejection.",
+	})
 )
 
 // RingSource provides the current ring and a client for each member.
@@ -111,6 +139,7 @@ func (s *Server) Match(ctx context.Context, req *pmv1.MatchRequest) (*pmv1.Match
 				"block id must be %d bytes, got %d", chain.HashSize, len(id))
 		}
 	}
+	start := time.Now()
 	for attempt := 0; ; attempt++ {
 		ring := s.src.Ring()
 		if ring == nil || ring.Size() == 0 || len(req.Chain) == 0 {
@@ -121,9 +150,13 @@ func (s *Server) Match(ctx context.Context, req *pmv1.MatchRequest) (*pmv1.Match
 		// have a newer one to retry with.
 		if wrongEpoch && attempt == 0 {
 			if newer := s.src.Ring(); newer != nil && newer.Epoch > ring.Epoch {
+				wrongEpochRetries.Inc()
 				continue
 			}
 		}
+		matchSeconds.Observe(time.Since(start).Seconds())
+		blocksRequested.Add(float64(len(req.Chain)))
+		blocksHit.Add(float64(resp.MatchedDepth))
 		s.emitAccess(req, resp)
 		return resp, nil
 	}
@@ -253,6 +286,7 @@ func (s *Server) PutBlocks(stream pmv1.GatewayService_PutBlocksServer) error {
 		if req.Block == nil || len(req.Block.BlockId) != chain.HashSize {
 			return status.Error(codes.InvalidArgument, "missing or malformed block")
 		}
+		costRequestedUS.Add(float64(req.Block.CostUs)) // write-back == prefill just paid
 		ring := s.src.Ring()
 		if ring == nil || ring.Size() == 0 {
 			continue // nowhere to store; misses refill later

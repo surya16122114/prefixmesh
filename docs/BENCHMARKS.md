@@ -3,6 +3,20 @@
 Rule: **every published number is reproducible with `make bench` and states its
 hardware, workload seed, and duration.** No synthetic vanity metrics.
 
+## 0. Results (one `make bench` run, Apple M4, Go 1.26, 2026-07-04)
+
+| Scenario | Result |
+|---|---|
+| Steady state (4 nodes, RF=2) | 85.8% hit rate / 87.0% prefill saved, p50 ~0.7 ms |
+| Kill a cache node (epoch heals ~2 s) | 89.9% / 92.9% right after — no visible dip |
+| Kill ALL 3 directory replicas + a node (frozen ring) | 89.9% / 92.9% — RF=2 failover alone carries it |
+| Eviction at equal memory (4×8 MB, 20% docs 10× cost) | LRU **46.0%** vs cost-aware **58.4%** prefill saved (same 64.6% block hit rate — the policy trades hits for value; gap ranged 4–12 pts across runs, sampling variance) |
+| Prefetcher A/B (double kill, idle window between) | off **83.3% / 80.2%** vs on **89.3% / 91.8%** — warming restores redundancy ahead of demand |
+| Kafka broker killed mid-run | hot path unaffected |
+
+Regenerate with `make bench` (writes `bench-results.md`; the Kafka scenario
+needs Docker and is skipped loudly without it).
+
 ## 1. Metrics
 
 | Metric | Definition |

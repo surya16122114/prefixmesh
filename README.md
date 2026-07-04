@@ -37,36 +37,30 @@ Full spec: [docs/DESIGN.md](docs/DESIGN.md) · roadmap:
 
 ## Status
 
-**M0–M3 complete** (see [milestones](docs/MILESTONES.md)): 3-replica **Paxos
-directory** (membership changes are consensus commits; quorum
-suspicion-exchange before any eviction; epoch-numbered rings streamed to the
-fleet; `WRONG_EPOCH` staleness rejection), **RF=2 replication**, a **paged
-arena block store** with cost-aware eviction, and the **Kafka event plane**:
-access telemetry feeds a prefetcher that re-warms demanded blocks onto new
-owners on every ring change — join re-warming and post-death redundancy
-restoration are the same mechanism. The Paxos core is tested under a simulated
-lossy/reordering network with concurrent proposers (`go test -race`); the full
-warm loop runs in CI over an in-memory bus, no broker required.
+**Complete through its committed scope (M0–M4)** — see
+[milestones](docs/MILESTONES.md). The mesh runs a 3-replica **Paxos directory**
+(membership changes are consensus commits; quorum suspicion-exchange before any
+eviction; epoch-numbered rings streamed to the fleet; `WRONG_EPOCH` staleness
+rejection), **RF=2 replication**, a **paged arena block store** with cost-aware
+eviction, the **Kafka event plane** (access telemetry → prefetcher → cache
+warming; node telemetry for future learners), and **Prometheus/Grafana
+observability**. The Paxos core is tested under a simulated lossy/reordering
+network with concurrent proposers (`go test -race`); the full warm loop runs in
+CI over an in-memory bus, no broker required.
 
-All numbers from one M2 MacBook, seeded and reproducible (`bin/loadgen --seed …`):
+## Measured results
 
-- Steady state (4 nodes): **~86% block hit rate / prefill compute saved**,
-  match p50 ~0.5 ms, p99 ~1.5 ms.
-- **Kill a cache node**: zero errors; `NodeDead` commits and the epoch bumps in
-  ~2 s; next run back at 85.9% (M0's static ring stayed collapsed at 7.7%).
-- **Kill the entire directory *and* a cache node** (ring frozen, no healing
-  possible): RF=2 failover holds the hit rate at **86.0%** — replication and
-  consensus are independent recovery layers.
-- **Eviction under pressure** (4×8 MB for a ~53 MB working set, 20% of docs
-  10× prefill cost): cost-aware eviction saves **50.5%** of prefill compute vs
-  LRU's **46.1%** at equal memory, by accepting a lower raw hit rate (62.9% vs
-  64.5%) — evict by value, not recency. With ample cache the policies tie, as
-  they should.
-- **Predictive warming** (real Kafka, double node-kill with an idle window):
-  without the event plane the mesh drops to 83.5% hit rate / 80.3% saved;
-  with the prefetcher re-replicating demanded blocks between the kills it
-  holds **89.8% / 92.1%** — the workload's ceiling. Killing the Kafka broker
-  mid-run changes nothing on the hot path.
+One `make bench` run (Apple M4, seeded; regenerate anytime — the suite
+verifies its own cleanup and startup so numbers can't come from a stale mesh):
+
+| Scenario | Result |
+|---|---|
+| Steady state (4 nodes, RF=2) | **85.8%** hit rate / **87.0%** prefill saved, match p50 <1 ms |
+| Cache node killed (Paxos heals epoch in ~2 s) | **89.9% / 92.9%** right after — zero errors, no visible dip (M0's static ring had collapsed to 7.7% forever) |
+| ALL 3 directory replicas + a node killed (frozen ring) | **89.9% / 92.9%** — RF=2 failover alone carries it; replication and consensus are independent recovery layers |
+| Eviction at equal memory, cache ⅔ short of working set | LRU **46.0%** vs cost-aware **58.4%** prefill saved at the same block hit rate — evict by value, not recency |
+| Prefetcher A/B (double kill, idle window between) | off **80.2%** saved vs on **91.8%** — warming restores redundancy ahead of demand |
+| Kafka broker killed mid-run | hot path unaffected (the plane is lossy by contract) |
 
 Benchmarks will be published only once they're reproducible via `make bench`, with
 hardware and workload seeds disclosed.
@@ -74,10 +68,16 @@ hardware and workload seeds disclosed.
 ## Development
 
 ```sh
-make proto   # regenerate gRPC stubs (protoc + protoc-gen-go/-go-grpc)
-make test    # go test -race ./...
-make compose-up  # kafka + 3 directory + 4 cache nodes + gateway
+make proto       # regenerate gRPC stubs (protoc + protoc-gen-go/-go-grpc)
+make test        # go test -race ./...
+make bench       # full reproducible benchmark suite -> bench-results.md
+make compose-up  # kafka + 3 directory + 4 cache nodes + prefetcher + gateway
+                 #   + prometheus (:9090) + grafana (:3000, anonymous admin)
 ```
+
+Every service serves Prometheus at `--metrics` (default `:9100`); the compose
+stack ships a provisioned Grafana dashboard: hit rate, match p50/p99, ring
+epoch, per-node occupancy, evictions, and warm-command throughput.
 
 ## Stack
 

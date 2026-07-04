@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -31,8 +32,14 @@ type Warmer struct {
 
 	clients map[string]pmv1.CacheNodeServiceClient // by source addr
 
-	// counters surfaced in logs (Prometheus in M4)
-	executed, skippedPresent, dropped uint64
+	// counters read by WarmerCollector; atomics because Handle runs on the
+	// consumer goroutine while Prometheus scrapes on another
+	executed, skippedPresent, dropped atomic.Uint64
+}
+
+// Counters returns (executed, skippedPresent, dropped).
+func (w *Warmer) Counters() (uint64, uint64, uint64) {
+	return w.executed.Load(), w.skippedPresent.Load(), w.dropped.Load()
 }
 
 func NewWarmer(self string, store blockstore.Store, ratePerSec float64) *Warmer {
@@ -87,18 +94,18 @@ func (w *Warmer) Handle(_, value []byte) {
 		return
 	}
 	if cmd.DeadlineUnixMs > 0 && time.Now().UnixMilli() > cmd.DeadlineUnixMs {
-		w.dropped++
+		w.dropped.Add(1)
 		return // stale command; demand has moved on
 	}
 	if w.store.Contains(chain.BlockID(cmd.BlockId)) {
-		w.skippedPresent++
+		w.skippedPresent.Add(1)
 		return
 	}
 	if cmd.SourceNode == "" {
 		return // RECOMPUTE source: meaningless in the simulation
 	}
 	if !w.allow() {
-		w.dropped++
+		w.dropped.Add(1)
 		return // over budget; foreground traffic wins
 	}
 	c, err := w.client(cmd.SourceNode)
@@ -120,9 +127,8 @@ func (w *Warmer) Handle(_, value []byte) {
 		return
 	}
 	w.store.Put(b)
-	w.executed++
-	if w.executed%100 == 1 {
+	if n := w.executed.Add(1); n%100 == 1 {
 		slog.Info("warmer: progress",
-			"executed", w.executed, "skipped_present", w.skippedPresent, "dropped", w.dropped)
+			"executed", n, "skipped_present", w.skippedPresent.Load(), "dropped", w.dropped.Load())
 	}
 }

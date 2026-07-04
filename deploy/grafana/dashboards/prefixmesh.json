@@ -1,0 +1,67 @@
+{
+  "title": "PrefixMesh — the one dashboard",
+  "uid": "prefixmesh",
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Block hit rate",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 } },
+      "targets": [{
+        "expr": "rate(pm_gateway_blocks_hit_total[1m]) / rate(pm_gateway_blocks_requested_total[1m])",
+        "legendFormat": "hit rate"
+      }]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Match latency (p50 / p99)",
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(pm_gateway_match_seconds_bucket[1m]))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.99, rate(pm_gateway_match_seconds_bucket[1m]))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Ring epoch",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "max(pm_directory_ring_epoch)", "legendFormat": "epoch" }]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Members",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "max(pm_directory_members)", "legendFormat": "members" }]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Prefill cost written back (µs/s) — lower is better once warm",
+      "gridPos": { "x": 16, "y": 4, "w": 8, "h": 4 },
+      "targets": [{ "expr": "rate(pm_gateway_cost_requested_us_total[1m])", "legendFormat": "recompute cost" }]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Arena occupancy per node",
+      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [{ "expr": "pm_cachenode_occupancy_bytes", "legendFormat": "{{instance}}" }]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Evictions/s and evicted prefill cost",
+      "gridPos": { "x": 8, "y": 8, "w": 8, "h": 8 },
+      "targets": [
+        { "expr": "sum(rate(pm_cachenode_evictions_total[1m]))", "legendFormat": "evictions/s" },
+        { "expr": "sum(rate(pm_cachenode_evicted_cost_us_total[1m]))", "legendFormat": "evicted cost µs/s" }
+      ]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Warm commands (executed / skipped / dropped)",
+      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 8 },
+      "targets": [
+        { "expr": "sum(rate(pm_cachenode_warms_executed_total[1m]))", "legendFormat": "executed" },
+        { "expr": "sum(rate(pm_cachenode_warms_skipped_present_total[1m]))", "legendFormat": "already present" },
+        { "expr": "sum(rate(pm_cachenode_warms_dropped_total[1m]))", "legendFormat": "dropped" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

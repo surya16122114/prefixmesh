@@ -22,7 +22,7 @@ vet:
 	$(GO) vet ./...
 
 bench:
-	@echo "benchmark suite lands in M4 — see docs/BENCHMARKS.md"
+	bash scripts/bench.sh
 
 compose-up:
 	docker compose -f deploy/docker-compose.yml up -d --build

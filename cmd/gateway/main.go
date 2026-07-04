@@ -20,6 +20,7 @@ import (
 	"github.com/surya16122114/prefixmesh/internal/events"
 	"github.com/surya16122114/prefixmesh/internal/gateway"
 	"github.com/surya16122114/prefixmesh/internal/hashring"
+	"github.com/surya16122114/prefixmesh/internal/metrics"
 	"github.com/surya16122114/prefixmesh/internal/ringwatch"
 )
 
@@ -59,7 +60,9 @@ func main() {
 	dirs := flag.String("directory", "", "comma-separated directory replica addrs")
 	rf := flag.Int("replication", 2, "replicas per block (1 = no replication)")
 	kafka := flag.String("kafka", "", "comma-separated Kafka brokers (empty = no telemetry)")
+	metricsAddr := flag.String("metrics", ":9100", "Prometheus /metrics address (empty = disabled)")
 	flag.Parse()
+	metrics.Serve(*metricsAddr)
 
 	var src gateway.RingSource
 	switch {

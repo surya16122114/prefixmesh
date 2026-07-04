@@ -1,6 +1,7 @@
 bin/
 *.test
 *.out
+bench-results.md
 .DS_Store
 .idea/
 .vscode/

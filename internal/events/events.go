@@ -8,8 +8,9 @@ import "context"
 
 // Topic names, versioned per DESIGN.md §4.4.
 const (
-	TopicAccess = "prefix.access.v1"
-	TopicWarm   = "cache.warm.v1"
+	TopicAccess    = "prefix.access.v1"
+	TopicWarm      = "cache.warm.v1"
+	TopicTelemetry = "cache.telemetry.v1"
 )
 
 // Producer publishes fire-and-forget. Implementations must be safe for

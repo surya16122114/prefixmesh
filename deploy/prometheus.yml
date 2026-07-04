@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway:9100"]
+  - job_name: cachenode
+    static_configs:
+      - targets:
+          - cachenode-1:9100
+          - cachenode-2:9100
+          - cachenode-3:9100
+          - cachenode-4:9100
+  - job_name: directory
+    static_configs:
+      - targets:
+          - directory-1:9100
+          - directory-2:9100
+          - directory-3:9100

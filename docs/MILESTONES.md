@@ -84,18 +84,29 @@ stretch goal. Estimates assume evenings/weekends pace.
   cross-run cache continuity was unmeasurable — split into `--workload-seed`
   (corpus identity, fixed) and `--seed` (request stream).
 
-## M4 — Benchmarks, chaos, observability (≈1 week)
-- [ ] Prometheus + Grafana in compose, the one dashboard
-- [ ] Reproducible benchmark suite (`make bench`) per BENCHMARKS.md — honest numbers
-      with hardware + workload disclosed
-- [ ] Chaos harness: scripted node kill / broker kill / directory-minority kill
-- **Demo:** the README numbers, regenerable by anyone with `make bench`.
+## M4 — Benchmarks, chaos, observability ✅ (done 2026-07-04)
+- [x] Prometheus `/metrics` on every service (`--metrics`, default :9100):
+      gateway match histogram + hit counters, cache-node store/warmer
+      collectors, directory epoch/members/log gauges
+- [x] Grafana + Prometheus in compose, provisioned datasource + the one
+      dashboard (hit rate, p50/p99, epoch, occupancy, evictions, warms)
+- [x] `cache.telemetry.v1` NodeTelemetry producer (5 s deltas) — the feed a
+      future eviction learner trains on
+- [x] Reproducible benchmark suite: `make bench` runs all four scenarios
+      (steady+kill, frozen-ring failover, eviction A/B, prefetcher A/B with
+      auto-started Kafka) with cleanup verification and bind checks baked in —
+      every pitfall that produced a garbage number during development is now
+      an automated guard
+- [x] Results table in BENCHMARKS.md §0, regenerated from one scripted run
 
-## M5 — Stretch (pick at most one)
-- (a) Tiny real-model end-to-end: llama.cpp/vLLM node using PrefixMesh as external
-      prefix store — proves the interface is real
-- (b) Eviction learner: train eviction scorer from `cache.telemetry.v1` history,
-      backtest against replay
+## M5 — Stretch (pick at most one) — NOT BUILT, deliberately
+Both options were costed and consciously deferred rather than half-shipped:
+- (a) Real-model end-to-end (llama.cpp/vLLM external prefix store) needs
+      inference-server surgery to export/import KV state — a project of its
+      own; the simulation already proves the distributed-systems claims.
+- (b) Eviction learner: the training feed (`cache.telemetry.v1`) now exists;
+      the honest next step is collecting replay corpora before fitting
+      anything. Backtest harness sketched in BENCHMARKS.md §3.
 
 ## Explicitly cut
 - Multi-region, durability, auth, cross-model sharing, real GPU memory management.

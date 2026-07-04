@@ -9,12 +9,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	pmv1 "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1"
 	"github.com/surya16122114/prefixmesh/internal/directory"
+	"github.com/surya16122114/prefixmesh/internal/metrics"
 )
 
 // parsePeers parses "dir-2=host:7200,dir-3=host:7200".
@@ -37,7 +39,9 @@ func main() {
 	listen := flag.String("listen", ":7200", "gRPC listen address")
 	replicaID := flag.String("replica-id", "", "unique replica id (required)")
 	peersFlag := flag.String("peers", "", `other replicas: "dir-2=host:7200,dir-3=host:7200"`)
+	metricsAddr := flag.String("metrics", ":9100", "Prometheus /metrics address (empty = disabled)")
 	flag.Parse()
+	metrics.Serve(*metricsAddr)
 	if *replicaID == "" {
 		slog.Error("--replica-id is required")
 		os.Exit(1)
@@ -57,6 +61,7 @@ func main() {
 		os.Exit(1)
 	}
 	srv.Run(context.Background())
+	prometheus.MustRegister(directory.NewCollector(srv))
 
 	lis, err := net.Listen("tcp", *listen)
 	if err != nil {
