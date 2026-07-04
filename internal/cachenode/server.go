@@ -1,9 +1,5 @@
 // Package cachenode implements CacheNodeService over a blockstore.Store
 // (DESIGN.md §4.2).
-//
-// M0 note: ring_epoch is carried on every request but not yet enforced —
-// epoch rejection (WRONG_EPOCH) lands with the M1 directory, since a static
-// ring has exactly one epoch.
 package cachenode
 
 import (
@@ -22,10 +18,32 @@ import (
 type Server struct {
 	pmv1.UnimplementedCacheNodeServiceServer
 	store blockstore.Store
+	// epoch returns the newest ring epoch this node has seen; nil disables
+	// enforcement (static-ring deployments have exactly one epoch).
+	epoch func() uint64
 }
 
 func New(store blockstore.Store) *Server {
 	return &Server{store: store}
+}
+
+// WithEpoch enables the WRONG_EPOCH protocol (DESIGN.md §4.1): callers whose
+// ring is older than ours get FAILED_PRECONDITION and must refresh. Callers
+// AHEAD of us are served — their routing is at least as fresh as our view.
+func (s *Server) WithEpoch(epoch func() uint64) *Server {
+	s.epoch = epoch
+	return s
+}
+
+func (s *Server) checkEpoch(callerEpoch uint64) error {
+	if s.epoch == nil || callerEpoch == 0 {
+		return nil
+	}
+	if mine := s.epoch(); callerEpoch < mine {
+		return status.Errorf(codes.FailedPrecondition,
+			"caller ring epoch %d < node epoch %d", callerEpoch, mine)
+	}
+	return nil
 }
 
 func toID(b []byte) (chain.BlockID, error) {
@@ -37,6 +55,9 @@ func toID(b []byte) (chain.BlockID, error) {
 }
 
 func (s *Server) Contains(_ context.Context, req *pmv1.ContainsRequest) (*pmv1.ContainsResponse, error) {
+	if err := s.checkEpoch(req.RingEpoch); err != nil {
+		return nil, err
+	}
 	present := make([]bool, len(req.BlockIds))
 	for i, raw := range req.BlockIds {
 		id, err := toID(raw)
@@ -49,6 +70,9 @@ func (s *Server) Contains(_ context.Context, req *pmv1.ContainsRequest) (*pmv1.C
 }
 
 func (s *Server) GetBlocks(req *pmv1.GetBlocksRequest, stream pmv1.CacheNodeService_GetBlocksServer) error {
+	if err := s.checkEpoch(req.RingEpoch); err != nil {
+		return err
+	}
 	for _, raw := range req.BlockIds {
 		id, err := toID(raw)
 		if err != nil {
@@ -77,6 +101,9 @@ func (s *Server) PutBlocks(stream pmv1.CacheNodeService_PutBlocksServer) error {
 		if err != nil {
 			return err
 		}
+		if err := s.checkEpoch(req.RingEpoch); err != nil {
+			return err
+		}
 		b, err := fromProto(req.Block)
 		if err != nil {
 			return err
@@ -90,6 +117,9 @@ func (s *Server) PutBlocks(stream pmv1.CacheNodeService_PutBlocksServer) error {
 }
 
 func (s *Server) Touch(_ context.Context, req *pmv1.TouchRequest) (*pmv1.TouchResponse, error) {
+	if err := s.checkEpoch(req.RingEpoch); err != nil {
+		return nil, err
+	}
 	for _, raw := range req.BlockIds {
 		id, err := toID(raw)
 		if err != nil {

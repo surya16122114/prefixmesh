@@ -20,19 +20,29 @@ stretch goal. Estimates assume evenings/weekends pace.
   membership can't change). Epoch bumps + rebalancing are what turn that into
   a dip-and-recover.
 
-## M1 — Control plane: Paxos directory (≈2–3 weeks, the meaty one)
-- [ ] Multi-decree Paxos log (port DKV `PaxosCoordinator` design to Go) — unit-tested
-      with a simulated lossy/reordering network harness
-- [ ] Membership + heartbeats + quorum-confirmed `NodeDead`
-- [ ] Epoch-numbered ring, `WatchRing` streams, `WRONG_EPOCH` retry protocol
-- [ ] Join/leave rebalancing with grace-period leases
-- **Demo:** `docker compose up`, kill a cache node mid-load, watch epoch bump + hit
-  rate recover; add a node, watch keyspace shift without a miss storm.
+## M1 — Control plane: Paxos directory ✅ (done 2026-07-04)
+- [x] Multi-decree Paxos log (port DKV `PaxosCoordinator` design to Go) — unit-tested
+      with a simulated lossy/reordering network harness (15% loss, concurrent
+      proposers; safety = identical applied sequences on every replica)
+- [x] Membership + heartbeats + `NodeDead` via consensus commit
+      (per-replica suspicion in M1 — a false positive self-heals by rejoin;
+      true quorum suspicion-exchange moved to M2)
+- [x] Epoch-numbered ring, `WatchRing` streams, `WRONG_EPOCH` retry protocol
+- [x] Join/leave rebalancing via epoch bumps + lazy refill
+      (grace-period **leases moved to M2** — they belong with replication,
+      where "old owner still serves reads" has data to serve)
+- [x] **Demo (measured):** kill a cache node mid-load → `NodeDead` committed and
+      epoch bumped in ~2 s → next run back at **85.9%** hit rate (M0's static
+      ring stayed collapsed at 7.7% forever). Live join → epoch bump, zero
+      disruption. Directory minority kill → commits keep flowing
+      (`internal/directory/integration_test.go`).
 
 ## M2 — Cache quality (≈1 week)
 - [ ] Paged arena block store (preallocated pages, occupancy metric)
 - [ ] Cost-aware eviction (frecency × cost / size) behind a flag vs plain-LRU baseline
 - [ ] Optional RF=2 replication for hot blocks (immutability makes this cheap)
+- [ ] Rebalance grace-period leases (from M1) + quorum suspicion-exchange for
+      failure detection (from M1)
 - **Demo:** benchmark showing cost-aware eviction beats LRU on prefill-µs-saved at
   equal memory.
 

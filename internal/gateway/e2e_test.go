@@ -46,7 +46,10 @@ func startGateway(t *testing.T, nodes map[string]string) pmv1.GatewayServiceClie
 		t.Fatal(err)
 	}
 	s := grpc.NewServer()
-	pmv1.RegisterGatewayServiceServer(s, gateway.New(hashring.New(1, nodes, 0), clients))
+	pmv1.RegisterGatewayServiceServer(s, gateway.New(&gateway.Static{
+		R:       hashring.New(1, nodes, 0),
+		Clients: clients,
+	}))
 	go s.Serve(lis)
 	t.Cleanup(s.Stop)
 

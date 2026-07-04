@@ -52,6 +52,10 @@ message ClusterCommand {
     string node_dead = 3;           // node_id, quorum-suspected
     RebalanceLease lease_grant = 4;
     string lease_release = 5;       // lease_id
+    // No-op used to fill log gaps: proposing it at an unchosen slot either
+    // completes a half-finished command discovered in phase 1, or burns the
+    // slot harmlessly so application can proceed.
+    bool noop = 6;
   }
 }
 
@@ -75,6 +79,7 @@ message PrepareResponse {
   bool promised = 1;
   uint64 accepted_ballot = 2;
   ClusterCommand accepted_value = 3;  // set iff a value was previously accepted
+  uint64 promised_ballot = 4;         // on reject: what we're promised to
 }
 
 message AcceptRequest {

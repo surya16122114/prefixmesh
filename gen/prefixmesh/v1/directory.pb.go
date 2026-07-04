@@ -375,6 +375,7 @@ type ClusterCommand struct {
 	//	*ClusterCommand_NodeDead
 	//	*ClusterCommand_LeaseGrant
 	//	*ClusterCommand_LeaseRelease
+	//	*ClusterCommand_Noop
 	Cmd           isClusterCommand_Cmd `protobuf_oneof:"cmd"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -462,6 +463,15 @@ func (x *ClusterCommand) GetLeaseRelease() string {
 	return ""
 }
 
+func (x *ClusterCommand) GetNoop() bool {
+	if x != nil {
+		if x, ok := x.Cmd.(*ClusterCommand_Noop); ok {
+			return x.Noop
+		}
+	}
+	return false
+}
+
 type isClusterCommand_Cmd interface {
 	isClusterCommand_Cmd()
 }
@@ -486,6 +496,13 @@ type ClusterCommand_LeaseRelease struct {
 	LeaseRelease string `protobuf:"bytes,5,opt,name=lease_release,json=leaseRelease,proto3,oneof"` // lease_id
 }
 
+type ClusterCommand_Noop struct {
+	// No-op used to fill log gaps: proposing it at an unchosen slot either
+	// completes a half-finished command discovered in phase 1, or burns the
+	// slot harmlessly so application can proceed.
+	Noop bool `protobuf:"varint,6,opt,name=noop,proto3,oneof"`
+}
+
 func (*ClusterCommand_NodeJoin) isClusterCommand_Cmd() {}
 
 func (*ClusterCommand_NodeLeave) isClusterCommand_Cmd() {}
@@ -495,6 +512,8 @@ func (*ClusterCommand_NodeDead) isClusterCommand_Cmd() {}
 func (*ClusterCommand_LeaseGrant) isClusterCommand_Cmd() {}
 
 func (*ClusterCommand_LeaseRelease) isClusterCommand_Cmd() {}
+
+func (*ClusterCommand_Noop) isClusterCommand_Cmd() {}
 
 // Lets the previous owner of a keyspace range keep serving reads for a grace
 // period after an epoch change, so joins don't cause miss storms.
@@ -630,7 +649,8 @@ type PrepareResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Promised       bool                   `protobuf:"varint,1,opt,name=promised,proto3" json:"promised,omitempty"`
 	AcceptedBallot uint64                 `protobuf:"varint,2,opt,name=accepted_ballot,json=acceptedBallot,proto3" json:"accepted_ballot,omitempty"`
-	AcceptedValue  *ClusterCommand        `protobuf:"bytes,3,opt,name=accepted_value,json=acceptedValue,proto3" json:"accepted_value,omitempty"` // set iff a value was previously accepted
+	AcceptedValue  *ClusterCommand        `protobuf:"bytes,3,opt,name=accepted_value,json=acceptedValue,proto3" json:"accepted_value,omitempty"`     // set iff a value was previously accepted
+	PromisedBallot uint64                 `protobuf:"varint,4,opt,name=promised_ballot,json=promisedBallot,proto3" json:"promised_ballot,omitempty"` // on reject: what we're promised to
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -684,6 +704,13 @@ func (x *PrepareResponse) GetAcceptedValue() *ClusterCommand {
 		return x.AcceptedValue
 	}
 	return nil
+}
+
+func (x *PrepareResponse) GetPromisedBallot() uint64 {
+	if x != nil {
+		return x.PromisedBallot
+	}
+	return 0
 }
 
 type AcceptRequest struct {
@@ -907,7 +934,7 @@ const file_prefixmesh_v1_directory_proto_rawDesc = "" +
 	"\x10WatchRingRequest\x12\x1f\n" +
 	"\vknown_epoch\x18\x01 \x01(\x04R\n" +
 	"knownEpoch\"\x10\n" +
-	"\x0eGetRingRequest\"\xf8\x01\n" +
+	"\x0eGetRingRequest\"\x8e\x02\n" +
 	"\x0eClusterCommand\x126\n" +
 	"\tnode_join\x18\x01 \x01(\v2\x17.prefixmesh.v1.NodeInfoH\x00R\bnodeJoin\x12\x1f\n" +
 	"\n" +
@@ -915,7 +942,8 @@ const file_prefixmesh_v1_directory_proto_rawDesc = "" +
 	"\tnode_dead\x18\x03 \x01(\tH\x00R\bnodeDead\x12@\n" +
 	"\vlease_grant\x18\x04 \x01(\v2\x1d.prefixmesh.v1.RebalanceLeaseH\x00R\n" +
 	"leaseGrant\x12%\n" +
-	"\rlease_release\x18\x05 \x01(\tH\x00R\fleaseReleaseB\x05\n" +
+	"\rlease_release\x18\x05 \x01(\tH\x00R\fleaseRelease\x12\x14\n" +
+	"\x04noop\x18\x06 \x01(\bH\x00R\x04noopB\x05\n" +
 	"\x03cmd\"\xac\x01\n" +
 	"\x0eRebalanceLease\x12\x19\n" +
 	"\blease_id\x18\x01 \x01(\tR\aleaseId\x12\x1b\n" +
@@ -926,11 +954,12 @@ const file_prefixmesh_v1_directory_proto_rawDesc = "" +
 	"\x0fexpires_unix_ms\x18\x05 \x01(\x03R\rexpiresUnixMs\"<\n" +
 	"\x0ePrepareRequest\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x16\n" +
-	"\x06ballot\x18\x02 \x01(\x04R\x06ballot\"\x9c\x01\n" +
+	"\x06ballot\x18\x02 \x01(\x04R\x06ballot\"\xc5\x01\n" +
 	"\x0fPrepareResponse\x12\x1a\n" +
 	"\bpromised\x18\x01 \x01(\bR\bpromised\x12'\n" +
 	"\x0faccepted_ballot\x18\x02 \x01(\x04R\x0eacceptedBallot\x12D\n" +
-	"\x0eaccepted_value\x18\x03 \x01(\v2\x1d.prefixmesh.v1.ClusterCommandR\racceptedValue\"p\n" +
+	"\x0eaccepted_value\x18\x03 \x01(\v2\x1d.prefixmesh.v1.ClusterCommandR\racceptedValue\x12'\n" +
+	"\x0fpromised_ballot\x18\x04 \x01(\x04R\x0epromisedBallot\"p\n" +
 	"\rAcceptRequest\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x16\n" +
 	"\x06ballot\x18\x02 \x01(\x04R\x06ballot\x123\n" +
@@ -1028,6 +1057,7 @@ func file_prefixmesh_v1_directory_proto_init() {
 		(*ClusterCommand_NodeDead)(nil),
 		(*ClusterCommand_LeaseGrant)(nil),
 		(*ClusterCommand_LeaseRelease)(nil),
+		(*ClusterCommand_Noop)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

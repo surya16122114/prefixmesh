@@ -1,10 +1,10 @@
 // Gateway: stateless data-plane entrypoint (DESIGN.md §4.1).
-//
-// M0 uses a static ring from --nodes; M1 replaces it with a
-// DirectoryService.WatchRing subscription.
+// With --directory the ring comes from WatchRing; --nodes keeps the M0
+// static mode for directory-less dev runs.
 package main
 
 import (
+	"context"
 	"flag"
 	"log/slog"
 	"net"
@@ -19,57 +19,73 @@ import (
 	pmv1 "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1"
 	"github.com/surya16122114/prefixmesh/internal/gateway"
 	"github.com/surya16122114/prefixmesh/internal/hashring"
+	"github.com/surya16122114/prefixmesh/internal/ringwatch"
 )
 
 // parseNodes parses "id=host:port,id=host:port".
-func parseNodes(s string) (map[string]string, error) {
+func parseNodes(s string) (map[string]string, bool) {
 	nodes := map[string]string{}
 	for _, part := range strings.Split(s, ",") {
 		id, addr, ok := strings.Cut(strings.TrimSpace(part), "=")
 		if !ok || id == "" || addr == "" {
-			return nil, os.ErrInvalid
+			return nil, false
 		}
 		nodes[id] = addr
 	}
-	return nodes, nil
+	return nodes, true
 }
 
-func main() {
-	listen := flag.String("listen", ":7000", "gRPC listen address")
-	nodesFlag := flag.String("nodes", "", `static ring membership: "cn-1=host:7100,cn-2=host:7101" (required until M1)`)
-	flag.Parse()
-	if *nodesFlag == "" {
-		slog.Error("--nodes is required (static ring; directory watch lands in M1)")
-		os.Exit(1)
+func staticSource(nodesFlag string) (gateway.RingSource, bool) {
+	nodes, ok := parseNodes(nodesFlag)
+	if !ok {
+		return nil, false
 	}
-	nodes, err := parseNodes(*nodesFlag)
-	if err != nil {
-		slog.Error("bad --nodes", "value", *nodesFlag)
-		os.Exit(1)
-	}
-
 	clients := make(map[string]pmv1.CacheNodeServiceClient, len(nodes))
 	for id, addr := range nodes {
 		conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			slog.Error("dial failed", "node", id, "addr", addr, "err", err)
-			os.Exit(1)
+			return nil, false
 		}
 		clients[id] = pmv1.NewCacheNodeServiceClient(conn)
 	}
-	ring := hashring.New(1, nodes, 0)
+	return &gateway.Static{R: hashring.New(1, nodes, 0), Clients: clients}, true
+}
+
+func main() {
+	listen := flag.String("listen", ":7000", "gRPC listen address")
+	nodesFlag := flag.String("nodes", "", `static ring: "cn-1=host:7100,cn-2=host:7101" (M0 mode)`)
+	dirs := flag.String("directory", "", "comma-separated directory replica addrs")
+	flag.Parse()
+
+	var src gateway.RingSource
+	switch {
+	case *dirs != "":
+		w := ringwatch.New(strings.Split(*dirs, ","), true, nil)
+		go w.Run(context.Background())
+		src = w
+	case *nodesFlag != "":
+		s, ok := staticSource(*nodesFlag)
+		if !ok {
+			os.Exit(1)
+		}
+		src = s
+	default:
+		slog.Error("one of --directory or --nodes is required")
+		os.Exit(1)
+	}
 
 	lis, err := net.Listen("tcp", *listen)
 	if err != nil {
 		slog.Error("listen failed", "addr", *listen, "err", err)
 		os.Exit(1)
 	}
-
 	s := grpc.NewServer()
-	pmv1.RegisterGatewayServiceServer(s, gateway.New(ring, clients))
+	pmv1.RegisterGatewayServiceServer(s, gateway.New(src))
 	healthpb.RegisterHealthServer(s, health.NewServer())
 
-	slog.Info("gateway listening", "addr", *listen, "ring_nodes", ring.Size())
+	slog.Info("gateway listening", "addr", *listen,
+		"mode", map[bool]string{true: "directory", false: "static"}[*dirs != ""])
 	if err := s.Serve(lis); err != nil {
 		slog.Error("serve failed", "err", err)
 		os.Exit(1)

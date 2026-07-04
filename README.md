@@ -37,13 +37,18 @@ Full spec: [docs/DESIGN.md](docs/DESIGN.md) · roadmap:
 
 ## Status
 
-**M0 complete** (see [milestones](docs/MILESTONES.md)): gateway + cache nodes serve
-the full Match/PutBlocks happy path on a static ring, with an end-to-end test and a
-reproducible loadgen. First local numbers (3 cache nodes, one M2 MacBook, seed 42,
-2000 requests — reproduce with `bin/loadgen --seed 42`): **85.8% block hit rate /
-prefill compute saved**, match p50 0.47 ms, p99 1.5 ms. Killing a node mid-run
-produces zero errors (misses only) — but on a static ring the hit rate can't recover,
-which is precisely the job of the M1 Paxos directory.
+**M0 + M1 complete** (see [milestones](docs/MILESTONES.md)): the mesh now runs a
+3-replica **Paxos directory** — membership changes are consensus commits, rings are
+epoch-numbered and streamed to the fleet, and stale routing is rejected via the
+`WRONG_EPOCH` protocol. The Paxos core is tested under a simulated lossy/reordering
+network with concurrent proposers (`go test -race`).
+
+Numbers from one M2 MacBook (4 cache nodes, 2000 requests/run, seeded — reproduce
+with `bin/loadgen --seed 42`): **85.8% block hit rate / prefill compute saved**,
+match p50 ~0.5 ms, p99 ~1.5 ms. Kill a cache node mid-load: **zero errors**,
+`NodeDead` commits and the epoch bumps in ~2 s, and the next run is back at 85.9% —
+on M0's static ring the same kill left the hit rate collapsed at 7.7% permanently.
+That delta is the reason the control plane exists.
 
 Benchmarks will be published only once they're reproducible via `make bench`, with
 hardware and workload seeds disclosed.

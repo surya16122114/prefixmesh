@@ -37,20 +37,30 @@ services:
 
   cachenode-1: &cachenode
     build: ..
-    command: ["/bin/cachenode", "--listen", ":7100", "--node-id", "cn-1"]
+    command: ["/bin/cachenode", "--listen", ":7100", "--node-id", "cn-1",
+              "--advertise", "cachenode-1:7100",
+              "--directory", "directory-1:7200,directory-2:7200,directory-3:7200"]
+    depends_on: [directory-1, directory-2, directory-3]
   cachenode-2:
     <<: *cachenode
-    command: ["/bin/cachenode", "--listen", ":7100", "--node-id", "cn-2"]
+    command: ["/bin/cachenode", "--listen", ":7100", "--node-id", "cn-2",
+              "--advertise", "cachenode-2:7100",
+              "--directory", "directory-1:7200,directory-2:7200,directory-3:7200"]
   cachenode-3:
     <<: *cachenode
-    command: ["/bin/cachenode", "--listen", ":7100", "--node-id", "cn-3"]
+    command: ["/bin/cachenode", "--listen", ":7100", "--node-id", "cn-3",
+              "--advertise", "cachenode-3:7100",
+              "--directory", "directory-1:7200,directory-2:7200,directory-3:7200"]
   cachenode-4:
     <<: *cachenode
-    command: ["/bin/cachenode", "--listen", ":7100", "--node-id", "cn-4"]
+    command: ["/bin/cachenode", "--listen", ":7100", "--node-id", "cn-4",
+              "--advertise", "cachenode-4:7100",
+              "--directory", "directory-1:7200,directory-2:7200,directory-3:7200"]
 
   gateway:
     build: ..
-    command: ["/bin/gateway", "--listen", ":7000"]
+    command: ["/bin/gateway", "--listen", ":7000",
+              "--directory", "directory-1:7200,directory-2:7200,directory-3:7200"]
     ports:
       - "7000:7000"
     depends_on:
