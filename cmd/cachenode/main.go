@@ -18,6 +18,7 @@ import (
 	pmv1 "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1"
 	"github.com/surya16122114/prefixmesh/internal/blockstore"
 	"github.com/surya16122114/prefixmesh/internal/cachenode"
+	"github.com/surya16122114/prefixmesh/internal/events"
 )
 
 func main() {
@@ -28,6 +29,8 @@ func main() {
 	pageBytes := flag.Int("page-bytes", 4096, "arena page size")
 	eviction := flag.String("eviction", "cost", "eviction policy: cost | lru (benchmark baseline)")
 	dirs := flag.String("directory", "", "comma-separated directory replica addrs (empty = static M0 mode)")
+	kafka := flag.String("kafka", "", "comma-separated Kafka brokers (empty = no warm consumer)")
+	warmRate := flag.Float64("warm-rate", 200, "max warm fetches per second")
 	flag.Parse()
 	if *nodeID == "" {
 		slog.Error("--node-id is required")
@@ -53,6 +56,20 @@ func main() {
 		}, strings.Split(*dirs, ","), store)
 		srv = srv.WithEpoch(agent.Epoch)
 		go agent.Run(context.Background())
+	}
+
+	if *kafka != "" {
+		warmer := cachenode.NewWarmer(*nodeID, store, *warmRate)
+		// Group per node: every node sees every warm command and filters by
+		// target — command volume is low and this avoids partition/target
+		// alignment machinery.
+		consumer, err := events.NewKafkaConsumer(strings.Split(*kafka, ","),
+			"warm-"+*nodeID, events.TopicWarm, warmer.Handle)
+		if err != nil {
+			slog.Error("kafka warm consumer init failed", "err", err)
+			os.Exit(1)
+		}
+		go consumer.Run(context.Background())
 	}
 
 	lis, err := net.Listen("tcp", *listen)

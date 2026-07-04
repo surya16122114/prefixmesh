@@ -33,8 +33,12 @@ type AccessEvent struct {
 	DeepestHit     []byte                 `protobuf:"bytes,5,opt,name=deepest_hit,json=deepestHit,proto3" json:"deepest_hit,omitempty"`              // block_id at matched depth (Markov state)
 	NextMiss       []byte                 `protobuf:"bytes,6,opt,name=next_miss,json=nextMiss,proto3" json:"next_miss,omitempty"`                    // first missed block_id, empty if full hit
 	TsUnixMs       int64                  `protobuf:"varint,7,opt,name=ts_unix_ms,json=tsUnixMs,proto3" json:"ts_unix_ms,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Full requested chain (h_1..h_n, 32 bytes each). Gives the prefetcher the
+	// block IDs and their parent->child edges in one event; ~32B x depth is
+	// cheap on a lossy telemetry topic and saves a second lookup channel.
+	Chain         [][]byte `protobuf:"bytes,8,rep,name=chain,proto3" json:"chain,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AccessEvent) Reset() {
@@ -116,6 +120,13 @@ func (x *AccessEvent) GetTsUnixMs() int64 {
 	return 0
 }
 
+func (x *AccessEvent) GetChain() [][]byte {
+	if x != nil {
+		return x.Chain
+	}
+	return nil
+}
+
 // Topic: cache.warm.v1 — key = target block_id (routes to the partition set
 // consumed by the block's owner). Producer: prefetcher. Consumer: cache nodes.
 // Idempotent: warming a present block is a no-op.
@@ -124,9 +135,10 @@ type WarmCommand struct {
 	BlockId        []byte                 `protobuf:"bytes,1,opt,name=block_id,json=blockId,proto3" json:"block_id,omitempty"`
 	ParentId       []byte                 `protobuf:"bytes,2,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
 	ModelId        string                 `protobuf:"bytes,3,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
-	SourceNode     string                 `protobuf:"bytes,4,opt,name=source_node,json=sourceNode,proto3" json:"source_node,omitempty"`                // peer to fetch from; empty => RECOMPUTE (skip in sim)
+	SourceNode     string                 `protobuf:"bytes,4,opt,name=source_node,json=sourceNode,proto3" json:"source_node,omitempty"`                // addr of a peer holding the block; empty => RECOMPUTE (skip in sim)
 	Confidence     float32                `protobuf:"fixed32,5,opt,name=confidence,proto3" json:"confidence,omitempty"`                                // model P(child|state), for effectiveness accounting
 	DeadlineUnixMs int64                  `protobuf:"varint,6,opt,name=deadline_unix_ms,json=deadlineUnixMs,proto3" json:"deadline_unix_ms,omitempty"` // drop stale commands instead of warming cold trails
+	TargetNode     string                 `protobuf:"bytes,7,opt,name=target_node,json=targetNode,proto3" json:"target_node,omitempty"`                // node_id that should execute the warm
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -201,6 +213,13 @@ func (x *WarmCommand) GetDeadlineUnixMs() int64 {
 		return x.DeadlineUnixMs
 	}
 	return 0
+}
+
+func (x *WarmCommand) GetTargetNode() string {
+	if x != nil {
+		return x.TargetNode
+	}
+	return ""
 }
 
 // Topic: cache.telemetry.v1 — key = node_id. Producer: cache nodes.
@@ -308,7 +327,7 @@ var File_prefixmesh_v1_events_proto protoreflect.FileDescriptor
 
 const file_prefixmesh_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1aprefixmesh/v1/events.proto\x12\rprefixmesh.v1\"\xf1\x01\n" +
+	"\x1aprefixmesh/v1/events.proto\x12\rprefixmesh.v1\"\x87\x02\n" +
 	"\vAccessEvent\x12\x1d\n" +
 	"\n" +
 	"chain_head\x18\x01 \x01(\fR\tchainHead\x12\x19\n" +
@@ -319,7 +338,8 @@ const file_prefixmesh_v1_events_proto_rawDesc = "" +
 	"deepestHit\x12\x1b\n" +
 	"\tnext_miss\x18\x06 \x01(\fR\bnextMiss\x12\x1c\n" +
 	"\n" +
-	"ts_unix_ms\x18\a \x01(\x03R\btsUnixMs\"\xcb\x01\n" +
+	"ts_unix_ms\x18\a \x01(\x03R\btsUnixMs\x12\x14\n" +
+	"\x05chain\x18\b \x03(\fR\x05chain\"\xec\x01\n" +
 	"\vWarmCommand\x12\x19\n" +
 	"\bblock_id\x18\x01 \x01(\fR\ablockId\x12\x1b\n" +
 	"\tparent_id\x18\x02 \x01(\fR\bparentId\x12\x19\n" +
@@ -329,7 +349,9 @@ const file_prefixmesh_v1_events_proto_rawDesc = "" +
 	"\n" +
 	"confidence\x18\x05 \x01(\x02R\n" +
 	"confidence\x12(\n" +
-	"\x10deadline_unix_ms\x18\x06 \x01(\x03R\x0edeadlineUnixMs\"\x88\x02\n" +
+	"\x10deadline_unix_ms\x18\x06 \x01(\x03R\x0edeadlineUnixMs\x12\x1f\n" +
+	"\vtarget_node\x18\a \x01(\tR\n" +
+	"targetNode\"\x88\x02\n" +
 	"\rNodeTelemetry\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12'\n" +
 	"\x0foccupancy_bytes\x18\x02 \x01(\x04R\x0eoccupancyBytes\x12%\n" +

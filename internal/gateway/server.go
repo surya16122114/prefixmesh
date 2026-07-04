@@ -10,12 +10,15 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	pmv1 "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1"
 	"github.com/surya16122114/prefixmesh/internal/chain"
+	"github.com/surya16122114/prefixmesh/internal/events"
 	"github.com/surya16122114/prefixmesh/internal/hashring"
 )
 
@@ -41,8 +44,9 @@ func (s *Static) Client(id string) (pmv1.CacheNodeServiceClient, bool) {
 
 type Server struct {
 	pmv1.UnimplementedGatewayServiceServer
-	src RingSource
-	rf  int // replication factor: blocks are Put to rf ring owners
+	src      RingSource
+	rf       int // replication factor: blocks are Put to rf ring owners
+	producer events.Producer
 }
 
 // New creates a gateway. rf is the replication factor (clamped to >= 1);
@@ -56,6 +60,39 @@ func New(src RingSource, rf int) *Server {
 		rf = 1
 	}
 	return &Server{src: src, rf: rf}
+}
+
+// WithEvents enables access telemetry on prefix.access.v1 (DESIGN.md §4.4):
+// one fire-and-forget event per Match, keyed by chain head. The hot path
+// never blocks on the event plane.
+func (s *Server) WithEvents(p events.Producer) *Server {
+	s.producer = p
+	return s
+}
+
+func (s *Server) emitAccess(req *pmv1.MatchRequest, resp *pmv1.MatchResponse) {
+	if s.producer == nil || len(req.Chain) == 0 {
+		return
+	}
+	ev := &pmv1.AccessEvent{
+		ChainHead:      req.Chain[0],
+		ModelId:        req.ModelId,
+		DepthRequested: uint32(len(req.Chain)),
+		DepthMatched:   resp.MatchedDepth,
+		TsUnixMs:       time.Now().UnixMilli(),
+		Chain:          req.Chain,
+	}
+	if d := int(resp.MatchedDepth); d > 0 {
+		ev.DeepestHit = req.Chain[d-1]
+	}
+	if d := int(resp.MatchedDepth); d < len(req.Chain) {
+		ev.NextMiss = req.Chain[d]
+	}
+	raw, err := proto.Marshal(ev)
+	if err != nil {
+		return
+	}
+	s.producer.Produce(events.TopicAccess, req.Chain[0], raw)
 }
 
 // Match resolves the longest cached prefix of the chain: one parallel
@@ -87,6 +124,7 @@ func (s *Server) Match(ctx context.Context, req *pmv1.MatchRequest) (*pmv1.Match
 				continue
 			}
 		}
+		s.emitAccess(req, resp)
 		return resp, nil
 	}
 }

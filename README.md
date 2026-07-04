@@ -37,12 +37,16 @@ Full spec: [docs/DESIGN.md](docs/DESIGN.md) · roadmap:
 
 ## Status
 
-**M0–M2 complete** (see [milestones](docs/MILESTONES.md)): 3-replica **Paxos
+**M0–M3 complete** (see [milestones](docs/MILESTONES.md)): 3-replica **Paxos
 directory** (membership changes are consensus commits; quorum
 suspicion-exchange before any eviction; epoch-numbered rings streamed to the
-fleet; `WRONG_EPOCH` staleness rejection), **RF=2 replication**, and a **paged
-arena block store** with cost-aware eviction. The Paxos core is tested under a
-simulated lossy/reordering network with concurrent proposers (`go test -race`).
+fleet; `WRONG_EPOCH` staleness rejection), **RF=2 replication**, a **paged
+arena block store** with cost-aware eviction, and the **Kafka event plane**:
+access telemetry feeds a prefetcher that re-warms demanded blocks onto new
+owners on every ring change — join re-warming and post-death redundancy
+restoration are the same mechanism. The Paxos core is tested under a simulated
+lossy/reordering network with concurrent proposers (`go test -race`); the full
+warm loop runs in CI over an in-memory bus, no broker required.
 
 All numbers from one M2 MacBook, seeded and reproducible (`bin/loadgen --seed …`):
 
@@ -58,6 +62,11 @@ All numbers from one M2 MacBook, seeded and reproducible (`bin/loadgen --seed �
   LRU's **46.1%** at equal memory, by accepting a lower raw hit rate (62.9% vs
   64.5%) — evict by value, not recency. With ample cache the policies tie, as
   they should.
+- **Predictive warming** (real Kafka, double node-kill with an idle window):
+  without the event plane the mesh drops to 83.5% hit rate / 80.3% saved;
+  with the prefetcher re-replicating demanded blocks between the kills it
+  holds **89.8% / 92.1%** — the workload's ceiling. Killing the Kafka broker
+  mid-run changes nothing on the hot path.
 
 Benchmarks will be published only once they're reproducible via `make bench`, with
 hardware and workload seeds disclosed.

@@ -39,8 +39,9 @@ type config struct {
 	sysBlocks   int
 	docBlocks   int
 	payload     int
-	seed        int64
-	modelID     string
+	seed         int64
+	workloadSeed int64
+	modelID      string
 	// Every expensiveEvery-th doc costs expensiveMult× to prefill (stand-in
 	// for long-context / multimodal-heavy documents) — the heterogeneity
 	// that cost-aware eviction exploits (docs/BENCHMARKS.md §3).
@@ -68,14 +69,17 @@ type metrics struct {
 }
 
 // tenantTokens returns the deterministic system-prompt tokens for a tenant.
+// Corpus identity comes from workloadSeed, NOT --seed: different --seed runs
+// must hit the same documents (only request order and suffixes vary), or
+// cross-run cache continuity can never be measured.
 func tenantTokens(cfg config, tenant int) []uint32 {
-	r := rand.New(rand.NewSource(cfg.seed ^ int64(tenant)<<32))
+	r := rand.New(rand.NewSource(cfg.workloadSeed ^ int64(tenant)<<32))
 	return randTokens(r, cfg.sysBlocks*cfg.blockSize)
 }
 
 // docTokens returns the deterministic tokens for one RAG document.
 func docTokens(cfg config, doc int) []uint32 {
-	r := rand.New(rand.NewSource(cfg.seed ^ 0x5eed ^ int64(doc)<<16))
+	r := rand.New(rand.NewSource(cfg.workloadSeed ^ 0x5eed ^ int64(doc)<<16))
 	return randTokens(r, cfg.docBlocks*cfg.blockSize)
 }
 
@@ -206,7 +210,8 @@ func main() {
 	flag.IntVar(&cfg.sysBlocks, "sys-blocks", 8, "system prompt length, blocks")
 	flag.IntVar(&cfg.docBlocks, "doc-blocks", 4, "document length, blocks")
 	flag.IntVar(&cfg.payload, "payload-bytes", 64<<10, "simulated KV bytes per block")
-	flag.Int64Var(&cfg.seed, "seed", 42, "workload PRNG seed")
+	flag.Int64Var(&cfg.seed, "seed", 42, "request-stream PRNG seed (order + unique suffixes)")
+	flag.Int64Var(&cfg.workloadSeed, "workload-seed", 1612, "corpus identity seed (system prompts + docs); keep fixed across runs")
 	flag.StringVar(&cfg.modelID, "model", "sim-7b", "model id (cache namespace)")
 	flag.IntVar(&cfg.expensiveEvery, "expensive-every", 5, "every Nth doc is expensive (0 = uniform costs)")
 	flag.Uint64Var(&cfg.expensiveMult, "expensive-mult", 10, "prefill cost multiplier for expensive docs")

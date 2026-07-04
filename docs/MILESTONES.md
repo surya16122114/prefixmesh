@@ -62,11 +62,27 @@ stretch goal. Estimates assume evenings/weekends pace.
   rate at **86.0%** (vs 85.8% healthy) — replication and consensus are
   independent failure-recovery layers.
 
-## M3 — Event plane: Kafka + prefetcher (≈1–2 weeks)
-- [ ] `prefix.access.v1` producer in gateway (fire-and-forget, buffered)
-- [ ] Prefetcher service: Markov next-block model, emits `cache.warm.v1`
-- [ ] Cache nodes consume warm commands (rate-limited, idempotent)
-- **Demo:** A/B run of loadgen with prefetcher on/off; measured hit-rate lift.
+## M3 — Event plane: Kafka + prefetcher ✅ (done 2026-07-04)
+- [x] `prefix.access.v1` producer in gateway (franz-go, acks=0 fire-and-forget;
+      events carry the full chain so the prefetcher sees blocks + edges)
+- [x] Prefetcher service: time-decayed per-block demand over the observed
+      chain structure; on every ring-epoch change it warms demanded blocks
+      onto their NEW owners, sourced from surviving old owners — one
+      mechanism covers join re-warming and post-death RF=2 restoration
+- [x] Cache nodes consume `cache.warm.v1` (token-bucket rate-limited,
+      idempotent by content address, deadline-dropped when stale)
+- [x] Transport seam (`internal/events`): Kafka in production, in-memory Bus
+      in tests — the full warm loop runs in CI without a broker
+- [x] **Demo (measured, real Kafka in Docker):** double node-kill with an
+      idle window between kills. Without the event plane: 83.5% hit rate /
+      80.3% prefill saved (blocks with both replicas on the dead pair are
+      lost). With the prefetcher: **89.8% / 92.1%** — back at the workload's
+      ~92% ceiling, warmed ahead of demand.
+- [x] **Chaos check:** `docker kill` the broker mid-mesh → hot path unaffected
+      (latency actually improved; the plane is lossy by contract).
+- Found & fixed en route: loadgen derived corpus content from `--seed`, so
+  cross-run cache continuity was unmeasurable — split into `--workload-seed`
+  (corpus identity, fixed) and `--seed` (request stream).
 
 ## M4 — Benchmarks, chaos, observability (≈1 week)
 - [ ] Prometheus + Grafana in compose, the one dashboard
