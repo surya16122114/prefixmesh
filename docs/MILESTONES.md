@@ -3,15 +3,22 @@
 Each milestone ends in something **runnable and demoable**. No milestone depends on a
 stretch goal. Estimates assume evenings/weekends pace.
 
-## M0 — Skeleton that answers a request (≈1 week)
+## M0 — Skeleton that answers a request ✅ (done 2026-07-04)
 - [x] Repo scaffold, proto contracts, CI (build + vet + test)
 - [x] Hash-chain library (`internal/chain`) with tests
 - [x] Consistent hash ring (`internal/hashring`) with virtual nodes + tests
-- [ ] In-memory block store with plain LRU (`internal/blockstore`)
-- [ ] Gateway + single cache node, **static ring from config** (no directory yet)
-- [ ] `loadgen` v0: synthetic workload (N system prompts, Zipfian RAG docs), prints
+- [x] In-memory block store with plain LRU (`internal/blockstore`)
+- [x] Gateway + cache nodes, **static ring from config** (no directory yet)
+- [x] `loadgen` v0: synthetic workload (N system prompts, Zipfian RAG docs), prints
       hit rate + p50/p99
-- **Demo:** two prompts sharing a system prompt; second one hits.
+- [x] **Demo:** two prompts sharing a system prompt; second one hits
+      (`internal/gateway/e2e_test.go` + live run: 85.8% block hit rate,
+      p50 0.47 ms / p99 1.5 ms on 3 local nodes, 2000 req; killing a node
+      produced zero errors — misses only).
+- Measured M1 motivation: on the static ring, one dead node collapsed the hit
+  rate to 7.7% (a dead owner anywhere in the prefix truncates the match, and
+  membership can't change). Epoch bumps + rebalancing are what turn that into
+  a dip-and-recover.
 
 ## M1 — Control plane: Paxos directory (≈2–3 weeks, the meaty one)
 - [ ] Multi-decree Paxos log (port DKV `PaxosCoordinator` design to Go) — unit-tested

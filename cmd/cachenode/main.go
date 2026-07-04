@@ -1,5 +1,4 @@
 // Cache node: stateful data-plane block server (DESIGN.md §4.2).
-// M0 wires up the server skeleton; the LRU blockstore lands next.
 package main
 
 import (
@@ -13,11 +12,9 @@ import (
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	pmv1 "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1"
+	"github.com/surya16122114/prefixmesh/internal/blockstore"
+	"github.com/surya16122114/prefixmesh/internal/cachenode"
 )
-
-type server struct {
-	pmv1.UnimplementedCacheNodeServiceServer
-}
 
 func main() {
 	listen := flag.String("listen", ":7100", "gRPC listen address")
@@ -36,7 +33,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	pmv1.RegisterCacheNodeServiceServer(s, &server{})
+	pmv1.RegisterCacheNodeServiceServer(s, cachenode.New(blockstore.NewLRU(*capacity)))
 	healthpb.RegisterHealthServer(s, health.NewServer())
 
 	slog.Info("cache node listening",
