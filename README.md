@@ -37,18 +37,27 @@ Full spec: [docs/DESIGN.md](docs/DESIGN.md) · roadmap:
 
 ## Status
 
-**M0 + M1 complete** (see [milestones](docs/MILESTONES.md)): the mesh now runs a
-3-replica **Paxos directory** — membership changes are consensus commits, rings are
-epoch-numbered and streamed to the fleet, and stale routing is rejected via the
-`WRONG_EPOCH` protocol. The Paxos core is tested under a simulated lossy/reordering
-network with concurrent proposers (`go test -race`).
+**M0–M2 complete** (see [milestones](docs/MILESTONES.md)): 3-replica **Paxos
+directory** (membership changes are consensus commits; quorum
+suspicion-exchange before any eviction; epoch-numbered rings streamed to the
+fleet; `WRONG_EPOCH` staleness rejection), **RF=2 replication**, and a **paged
+arena block store** with cost-aware eviction. The Paxos core is tested under a
+simulated lossy/reordering network with concurrent proposers (`go test -race`).
 
-Numbers from one M2 MacBook (4 cache nodes, 2000 requests/run, seeded — reproduce
-with `bin/loadgen --seed 42`): **85.8% block hit rate / prefill compute saved**,
-match p50 ~0.5 ms, p99 ~1.5 ms. Kill a cache node mid-load: **zero errors**,
-`NodeDead` commits and the epoch bumps in ~2 s, and the next run is back at 85.9% —
-on M0's static ring the same kill left the hit rate collapsed at 7.7% permanently.
-That delta is the reason the control plane exists.
+All numbers from one M2 MacBook, seeded and reproducible (`bin/loadgen --seed …`):
+
+- Steady state (4 nodes): **~86% block hit rate / prefill compute saved**,
+  match p50 ~0.5 ms, p99 ~1.5 ms.
+- **Kill a cache node**: zero errors; `NodeDead` commits and the epoch bumps in
+  ~2 s; next run back at 85.9% (M0's static ring stayed collapsed at 7.7%).
+- **Kill the entire directory *and* a cache node** (ring frozen, no healing
+  possible): RF=2 failover holds the hit rate at **86.0%** — replication and
+  consensus are independent recovery layers.
+- **Eviction under pressure** (4×8 MB for a ~53 MB working set, 20% of docs
+  10× prefill cost): cost-aware eviction saves **50.5%** of prefill compute vs
+  LRU's **46.1%** at equal memory, by accepting a lower raw hit rate (62.9% vs
+  64.5%) — evict by value, not recency. With ample cache the policies tie, as
+  they should.
 
 Benchmarks will be published only once they're reproducible via `make bench`, with
 hardware and workload seeds disclosed.

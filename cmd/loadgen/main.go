@@ -41,6 +41,19 @@ type config struct {
 	payload     int
 	seed        int64
 	modelID     string
+	// Every expensiveEvery-th doc costs expensiveMult× to prefill (stand-in
+	// for long-context / multimodal-heavy documents) — the heterogeneity
+	// that cost-aware eviction exploits (docs/BENCHMARKS.md §3).
+	expensiveEvery int
+	expensiveMult  uint64
+}
+
+// docCostMult is the per-doc prefill cost multiplier.
+func (c config) docCostMult(doc int) uint64 {
+	if c.expensiveEvery > 0 && doc%c.expensiveEvery == 0 {
+		return c.expensiveMult
+	}
+	return 1
 }
 
 type metrics struct {
@@ -78,11 +91,32 @@ func worker(ctx context.Context, cfg config, client pmv1.GatewayServiceClient,
 	m *metrics, workerID, requests int) error {
 
 	r := rand.New(rand.NewSource(cfg.seed + int64(workerID)*1_000_003))
-	zipf := rand.NewZipf(r, cfg.zipfS, 1, uint64(cfg.docs-1))
+	// zipf-s <= 1 means uniform popularity (Go's Zipf needs s > 1, and even
+	// s=1.01 is still ~200x skewed across 200 docs — not "nearly flat").
+	var zipf *rand.Zipf
+	if cfg.zipfS > 1 {
+		zipf = rand.NewZipf(r, cfg.zipfS, 1, uint64(cfg.docs-1))
+	}
+	pickDoc := func() int {
+		if zipf != nil {
+			return int(zipf.Uint64())
+		}
+		return r.Intn(cfg.docs)
+	}
 
 	for i := 0; i < requests; i++ {
 		tenant := r.Intn(cfg.tenants)
-		doc := int(zipf.Uint64())
+		doc := pickDoc()
+		docMult := cfg.docCostMult(doc)
+		// System-prompt and suffix blocks cost 1×; the doc's blocks carry its
+		// multiplier. Segment boundaries align with block boundaries because
+		// sys/doc lengths are whole blocks.
+		blockMult := func(j int) uint64 {
+			if j >= cfg.sysBlocks && j < cfg.sysBlocks+cfg.docBlocks {
+				return docMult
+			}
+			return 1
+		}
 
 		tokens := append([]uint32{}, tenantTokens(cfg, tenant)...)
 		tokens = append(tokens, docTokens(cfg, doc)...)
@@ -114,7 +148,7 @@ func worker(ctx context.Context, cfg config, client pmv1.GatewayServiceClient,
 			m.fullHits.Add(1)
 		}
 		for j, blk := range blocks {
-			cost := uint64(len(blk)) * costPerTokenUS
+			cost := uint64(len(blk)) * costPerTokenUS * blockMult(j)
 			m.costRequestedUS.Add(cost)
 			if j < depth {
 				m.costSavedUS.Add(cost)
@@ -137,7 +171,7 @@ func worker(ctx context.Context, cfg config, client pmv1.GatewayServiceClient,
 						ModelId:    cfg.modelID,
 						Payload:    payload,
 						TokenCount: uint32(len(blk)),
-						CostUs:     uint64(len(blk)) * costPerTokenUS,
+						CostUs:     uint64(len(blk)) * costPerTokenUS * blockMult(j),
 					}}); err != nil {
 						return fmt.Errorf("PutBlocks send: %w", err)
 					}
@@ -174,6 +208,8 @@ func main() {
 	flag.IntVar(&cfg.payload, "payload-bytes", 64<<10, "simulated KV bytes per block")
 	flag.Int64Var(&cfg.seed, "seed", 42, "workload PRNG seed")
 	flag.StringVar(&cfg.modelID, "model", "sim-7b", "model id (cache namespace)")
+	flag.IntVar(&cfg.expensiveEvery, "expensive-every", 5, "every Nth doc is expensive (0 = uniform costs)")
+	flag.Uint64Var(&cfg.expensiveMult, "expensive-mult", 10, "prefill cost multiplier for expensive docs")
 	flag.Parse()
 
 	conn, err := grpc.NewClient(cfg.gateway,

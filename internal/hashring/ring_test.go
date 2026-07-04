@@ -72,6 +72,52 @@ func TestMinimalMovementOnJoin(t *testing.T) {
 	}
 }
 
+func TestOwnersDistinctAndStable(t *testing.T) {
+	r := New(1, testNodes(5), 0)
+	for i := 0; i < 1000; i++ {
+		owners := r.Owners(key(i), 2)
+		if len(owners) != 2 {
+			t.Fatalf("key %d: got %d owners", i, len(owners))
+		}
+		if owners[0] == owners[1] {
+			t.Fatalf("key %d: duplicate owner %s", i, owners[0])
+		}
+		if primary, _, _ := r.Owner(key(i)); primary != owners[0] {
+			t.Fatalf("key %d: Owner and Owners[0] disagree", i)
+		}
+	}
+	// Asking for more replicas than nodes caps at the node count.
+	if got := r.Owners(key(1), 10); len(got) != 5 {
+		t.Fatalf("want 5 capped owners, got %d", len(got))
+	}
+}
+
+// TestOwnerPairSurvivesJoin: with RF=2, a join must leave at least one of the
+// two owners unchanged for the overwhelming majority of keys — that's what
+// lets the mesh serve through rebalances without leases.
+func TestOwnerPairSurvivesJoin(t *testing.T) {
+	const keys = 20_000
+	before := New(1, testNodes(8), 0)
+	after := New(2, testNodes(9), 0)
+	lost := 0
+	for i := 0; i < keys; i++ {
+		b := before.Owners(key(i), 2)
+		a := after.Owners(key(i), 2)
+		kept := false
+		for _, x := range a {
+			if x == b[0] || x == b[1] {
+				kept = true
+			}
+		}
+		if !kept {
+			lost++
+		}
+	}
+	if frac := float64(lost) / keys; frac > 0.01 {
+		t.Errorf("join broke both owners for %.2f%% of keys, want <1%%", frac*100)
+	}
+}
+
 func TestEmptyRing(t *testing.T) {
 	r := New(1, nil, 0)
 	if _, _, ok := r.Owner(key(1)); ok {

@@ -42,10 +42,20 @@ func (s *Static) Client(id string) (pmv1.CacheNodeServiceClient, bool) {
 type Server struct {
 	pmv1.UnimplementedGatewayServiceServer
 	src RingSource
+	rf  int // replication factor: blocks are Put to rf ring owners
 }
 
-func New(src RingSource) *Server {
-	return &Server{src: src}
+// New creates a gateway. rf is the replication factor (clamped to >= 1);
+// with rf=2 every block is written to its primary and successor owner, and
+// Match falls back to the successor when the primary misses or is down —
+// this is what lets the mesh serve straight through single-node loss and
+// ring rebalances (a membership change shifts at most one member of an
+// owner pair; see hashring.Owners).
+func New(src RingSource, rf int) *Server {
+	if rf < 1 {
+		rf = 1
+	}
+	return &Server{src: src, rf: rf}
 }
 
 // Match resolves the longest cached prefix of the chain: one parallel
@@ -82,64 +92,22 @@ func (s *Server) Match(ctx context.Context, req *pmv1.MatchRequest) (*pmv1.Match
 }
 
 func (s *Server) matchOnRing(ctx context.Context, ring *hashring.Ring, req *pmv1.MatchRequest) (*pmv1.MatchResponse, bool) {
-	type batch struct {
-		client  pmv1.CacheNodeServiceClient
-		indices []int
-		ids     [][]byte
-	}
-	batches := map[string]*batch{}
-	owners := make([]string, len(req.Chain))
-	for i, id := range req.Chain {
-		nodeID, _, ok := ring.Owner(id)
-		if !ok {
-			continue
-		}
-		owners[i] = nodeID
-		b, ok := batches[nodeID]
-		if !ok {
-			client, haveClient := s.src.Client(nodeID)
-			if !haveClient {
-				continue // member without a live conn yet: its blocks miss
-			}
-			b = &batch{client: client}
-			batches[nodeID] = b
-		}
-		b.indices = append(b.indices, i)
-		b.ids = append(b.ids, id)
-	}
-
 	present := make([]bool, len(req.Chain))
-	var (
-		wg         sync.WaitGroup
-		mu         sync.Mutex
-		wrongEpoch bool
-	)
-	for _, b := range batches {
-		wg.Add(1)
-		go func(b *batch) {
-			defer wg.Done()
-			resp, err := b.client.Contains(ctx, &pmv1.ContainsRequest{
-				RingEpoch: ring.Epoch,
-				BlockIds:  b.ids,
-			})
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				// Unreachable node -> its blocks are misses, never an error
-				// surfaced to the client (DESIGN.md §5).
-				if status.Code(err) == codes.FailedPrecondition {
-					wrongEpoch = true
-				}
-				return
-			}
-			for j, idx := range b.indices {
-				if j < len(resp.Present) {
-					present[idx] = resp.Present[j]
-				}
-			}
-		}(b)
+	holders := make([]string, len(req.Chain)) // node that answered "have it"
+
+	// Round 1: probe each block's primary owner. Round 2 (rf>1): re-probe
+	// the blocks the primary missed — or couldn't answer — at their next
+	// replica. Two bounded rounds, still zero directory involvement.
+	probe := make([]int, len(req.Chain))
+	for i := range probe {
+		probe[i] = i
 	}
-	wg.Wait()
+	var wrongEpoch bool
+	for replica := 0; replica < s.rf && len(probe) > 0; replica++ {
+		retry, we := s.probeReplica(ctx, ring, req.Chain, probe, replica, present, holders)
+		wrongEpoch = wrongEpoch || we
+		probe = retry
+	}
 
 	depth := 0
 	for depth < len(present) && present[depth] {
@@ -150,7 +118,7 @@ func (s *Server) matchOnRing(ctx context.Context, ring *hashring.Ring, req *pmv1
 	for i := 0; i < depth; i++ {
 		refs[i] = &pmv1.BlockRef{
 			BlockId:  req.Chain[i],
-			NodeAddr: nodes[owners[i]],
+			NodeAddr: nodes[holders[i]],
 		}
 	}
 	return &pmv1.MatchResponse{
@@ -158,6 +126,77 @@ func (s *Server) matchOnRing(ctx context.Context, ring *hashring.Ring, req *pmv1
 		Refs:         refs,
 		RingEpoch:    ring.Epoch,
 	}, wrongEpoch
+}
+
+// probeReplica asks the replica-th owner of each listed block whether it has
+// it, filling present/holders for hits and returning the indices worth
+// retrying at the next replica.
+func (s *Server) probeReplica(ctx context.Context, ring *hashring.Ring, chainIDs [][]byte,
+	indices []int, replica int, present []bool, holders []string) (retry []int, wrongEpoch bool) {
+
+	type batch struct {
+		client  pmv1.CacheNodeServiceClient
+		indices []int
+		ids     [][]byte
+	}
+	batches := map[string]*batch{}
+	var unroutable []int
+	for _, i := range indices {
+		owners := ring.Owners(chainIDs[i], replica+1)
+		if len(owners) <= replica {
+			continue // fewer nodes than replicas: nothing further to ask
+		}
+		nodeID := owners[replica]
+		b, ok := batches[nodeID]
+		if !ok {
+			client, haveClient := s.src.Client(nodeID)
+			if !haveClient {
+				unroutable = append(unroutable, i) // no conn yet: try next replica
+				continue
+			}
+			b = &batch{client: client}
+			batches[nodeID] = b
+		}
+		b.indices = append(b.indices, i)
+		b.ids = append(b.ids, chainIDs[i])
+	}
+
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
+	retry = unroutable
+	for nodeID, b := range batches {
+		wg.Add(1)
+		go func(nodeID string, b *batch) {
+			defer wg.Done()
+			resp, err := b.client.Contains(ctx, &pmv1.ContainsRequest{
+				RingEpoch: ring.Epoch,
+				BlockIds:  b.ids,
+			})
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				// Unreachable owner: its blocks go to the next replica; with
+				// rf=1 they simply miss — never an error (DESIGN.md §5).
+				if status.Code(err) == codes.FailedPrecondition {
+					wrongEpoch = true
+				}
+				retry = append(retry, b.indices...)
+				return
+			}
+			for j, idx := range b.indices {
+				if j < len(resp.Present) && resp.Present[j] {
+					present[idx] = true
+					holders[idx] = nodeID
+				} else {
+					retry = append(retry, idx)
+				}
+			}
+		}(nodeID, b)
+	}
+	wg.Wait()
+	return retry, wrongEpoch
 }
 
 // PutBlocks buffers the client stream, routes blocks to their ring owners,
@@ -180,11 +219,9 @@ func (s *Server) PutBlocks(stream pmv1.GatewayService_PutBlocksServer) error {
 		if ring == nil || ring.Size() == 0 {
 			continue // nowhere to store; misses refill later
 		}
-		nodeID, _, ok := ring.Owner(req.Block.BlockId)
-		if !ok {
-			continue
+		for _, nodeID := range ring.Owners(req.Block.BlockId, s.rf) {
+			byOwner[nodeID] = append(byOwner[nodeID], req.Block)
 		}
-		byOwner[nodeID] = append(byOwner[nodeID], req.Block)
 	}
 
 	ring := s.src.Ring()

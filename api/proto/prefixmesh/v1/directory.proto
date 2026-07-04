@@ -22,6 +22,12 @@ service DirectoryService {
 
   rpc GetRing(GetRingRequest) returns (Ring);
 
+  // Suspicion exchange: before proposing NodeDead, a replica asks its peers
+  // whether they also stopped hearing from the node. Only a majority of
+  // suspecting replicas (self included) may propose — one replica's network
+  // blip can no longer evict a healthy node.
+  rpc Suspect(SuspectRequest) returns (SuspectResponse);
+
   // --- replica-internal Paxos RPCs ---
   rpc Prepare(PrepareRequest) returns (PrepareResponse);
   rpc Accept(AcceptRequest) returns (AcceptResponse);
@@ -43,6 +49,9 @@ message HeartbeatResponse {}
 
 message WatchRingRequest { uint64 known_epoch = 1; }
 message GetRingRequest {}
+
+message SuspectRequest { string node_id = 1; }
+message SuspectResponse { bool suspect = 1; }
 
 // Commands agreed via Paxos, applied in log order to the cluster state machine.
 message ClusterCommand {

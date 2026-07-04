@@ -23,6 +23,7 @@ type Server struct {
 	node *paxos.Node
 	sm   *StateMachine
 	hb   *hbTracker
+	tr   *grpcTransport // reused for suspicion exchange between replicas
 }
 
 type Config struct {
@@ -67,7 +68,7 @@ func New(cfg Config) (*Server, error) {
 	}, tr, log)
 	tr.local = node
 
-	s := &Server{node: node, sm: sm, hb: newHBTracker(cfg)}
+	s := &Server{node: node, sm: sm, hb: newHBTracker(cfg), tr: tr}
 	sm.onJoin = s.hb.seed // joining members get a fresh grace period
 	return s, nil
 }
@@ -130,6 +131,16 @@ func (s *Server) Heartbeat(_ context.Context, req *pmv1.HeartbeatRequest) (*pmv1
 
 func (s *Server) GetRing(context.Context, *pmv1.GetRingRequest) (*pmv1.Ring, error) {
 	return s.sm.Ring(), nil
+}
+
+// Suspect answers a peer's suspicion probe: do WE also consider this member
+// heartbeat-expired? (Non-members are trivially "suspect" so a straggling
+// removal converges.)
+func (s *Server) Suspect(_ context.Context, req *pmv1.SuspectRequest) (*pmv1.SuspectResponse, error) {
+	if !s.sm.HasMember(req.NodeId) {
+		return &pmv1.SuspectResponse{Suspect: true}, nil
+	}
+	return &pmv1.SuspectResponse{Suspect: s.hb.expired(req.NodeId, time.Now())}, nil
 }
 
 func (s *Server) WatchRing(req *pmv1.WatchRingRequest, stream pmv1.DirectoryService_WatchRingServer) error {

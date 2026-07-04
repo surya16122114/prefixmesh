@@ -37,14 +37,30 @@ stretch goal. Estimates assume evenings/weekends pace.
       disruption. Directory minority kill → commits keep flowing
       (`internal/directory/integration_test.go`).
 
-## M2 — Cache quality (≈1 week)
-- [ ] Paged arena block store (preallocated pages, occupancy metric)
-- [ ] Cost-aware eviction (frecency × cost / size) behind a flag vs plain-LRU baseline
-- [ ] Optional RF=2 replication for hot blocks (immutability makes this cheap)
-- [ ] Rebalance grace-period leases (from M1) + quorum suspicion-exchange for
-      failure detection (from M1)
-- **Demo:** benchmark showing cost-aware eviction beats LRU on prefill-µs-saved at
-  equal memory.
+## M2 — Cache quality ✅ (done 2026-07-04)
+- [x] Paged arena block store: preallocated page arena, exact page-level
+      occupancy, fragmentation impossible by construction; LRU and cost
+      policies share the arena so A/B runs compare at truly equal memory
+- [x] Cost-aware eviction (decayed-frecency × cost / bytes, sampled
+      approximated-min à la Redis) behind `--eviction cost|lru`
+- [x] RF=2 replication (`--replication` on the gateway): every block on its
+      ring owner + successor; Match retries misses at the next replica
+- [x] Quorum suspicion-exchange (from M1): a replica proposes NodeDead only
+      after a majority of replicas confirm they also lost the node's
+      heartbeats — one replica's blip can't evict a healthy node
+- [x] Grace-period leases: **cut, deliberately** — RF=2 subsumes them. A
+      membership change shifts at most one member of an owner pair
+      (hashring test: <1% of keys lose both), so the surviving replica
+      serves through rebalances with no lease machinery at all.
+- **Measured (4 nodes × 8 MB, uniform doc popularity, 20% of docs 10× cost,
+  seeds disclosed):** cost-aware saves **50.5%** of prefill compute vs LRU's
+  **46.1%** at equal memory — while accepting a lower raw hit rate (62.9% vs
+  64.5%): it evicts by value, not recency. Under cache-plenty (zipf 1.2) the
+  policies tie, as they should — eviction policy only matters under pressure.
+- **Measured resilience:** with ALL 3 directory replicas killed (ring frozen,
+  no epoch bump possible) and then a cache node killed, RF=2 held the hit
+  rate at **86.0%** (vs 85.8% healthy) — replication and consensus are
+  independent failure-recovery layers.
 
 ## M3 — Event plane: Kafka + prefetcher (≈1–2 weeks)
 - [ ] `prefix.access.v1` producer in gateway (fire-and-forget, buffered)

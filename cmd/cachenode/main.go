@@ -25,6 +25,8 @@ func main() {
 	advertise := flag.String("advertise", "", "address other services reach us at (default: listen addr)")
 	nodeID := flag.String("node-id", "", "unique node id (required)")
 	capacity := flag.Uint64("capacity-bytes", 1<<30, "block store capacity")
+	pageBytes := flag.Int("page-bytes", 4096, "arena page size")
+	eviction := flag.String("eviction", "cost", "eviction policy: cost | lru (benchmark baseline)")
 	dirs := flag.String("directory", "", "comma-separated directory replica addrs (empty = static M0 mode)")
 	flag.Parse()
 	if *nodeID == "" {
@@ -34,8 +36,13 @@ func main() {
 	if *advertise == "" {
 		*advertise = *listen
 	}
+	policy, err := blockstore.ParsePolicy(*eviction)
+	if err != nil {
+		slog.Error("bad --eviction", "err", err)
+		os.Exit(1)
+	}
 
-	store := blockstore.NewLRU(*capacity)
+	store := blockstore.NewPaged(*capacity, *pageBytes, policy)
 	srv := cachenode.New(store)
 
 	if *dirs != "" {
@@ -59,6 +66,7 @@ func main() {
 
 	slog.Info("cache node listening",
 		"node_id", *nodeID, "addr", *listen, "capacity_bytes", *capacity,
+		"eviction", string(policy),
 		"mode", map[bool]string{true: "directory", false: "static"}[*dirs != ""])
 	if err := s.Serve(lis); err != nil {
 		slog.Error("serve failed", "err", err)

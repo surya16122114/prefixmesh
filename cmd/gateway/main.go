@@ -56,6 +56,7 @@ func main() {
 	listen := flag.String("listen", ":7000", "gRPC listen address")
 	nodesFlag := flag.String("nodes", "", `static ring: "cn-1=host:7100,cn-2=host:7101" (M0 mode)`)
 	dirs := flag.String("directory", "", "comma-separated directory replica addrs")
+	rf := flag.Int("replication", 2, "replicas per block (1 = no replication)")
 	flag.Parse()
 
 	var src gateway.RingSource
@@ -81,10 +82,10 @@ func main() {
 		os.Exit(1)
 	}
 	s := grpc.NewServer()
-	pmv1.RegisterGatewayServiceServer(s, gateway.New(src))
+	pmv1.RegisterGatewayServiceServer(s, gateway.New(src, *rf))
 	healthpb.RegisterHealthServer(s, health.NewServer())
 
-	slog.Info("gateway listening", "addr", *listen,
+	slog.Info("gateway listening", "addr", *listen, "replication", *rf,
 		"mode", map[bool]string{true: "directory", false: "static"}[*dirs != ""])
 	if err := s.Serve(lis); err != nil {
 		slog.Error("serve failed", "err", err)

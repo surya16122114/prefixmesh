@@ -2,6 +2,7 @@ package gateway_test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
 
@@ -31,6 +32,10 @@ func startCacheNode(t *testing.T) string {
 }
 
 func startGateway(t *testing.T, nodes map[string]string) pmv1.GatewayServiceClient {
+	return startGatewayRF(t, nodes, 1)
+}
+
+func startGatewayRF(t *testing.T, nodes map[string]string, rf int) pmv1.GatewayServiceClient {
 	t.Helper()
 	clients := map[string]pmv1.CacheNodeServiceClient{}
 	for id, addr := range nodes {
@@ -49,7 +54,7 @@ func startGateway(t *testing.T, nodes map[string]string) pmv1.GatewayServiceClie
 	pmv1.RegisterGatewayServiceServer(s, gateway.New(&gateway.Static{
 		R:       hashring.New(1, nodes, 0),
 		Clients: clients,
-	}))
+	}, rf))
 	go s.Serve(lis)
 	t.Cleanup(s.Stop)
 
@@ -173,6 +178,79 @@ func TestSharedPrefixHitsAcrossRequests(t *testing.T) {
 	}
 	if putResp.Stored != 0 || putResp.Existing != 3 {
 		t.Fatalf("re-put: stored=%d existing=%d, want 0/3", putResp.Stored, putResp.Existing)
+	}
+}
+
+// TestRF2ServesThroughNodeLoss: with replication factor 2 every block lives
+// on two nodes, so killing either one must leave the full chain servable —
+// before the control plane even notices.
+func TestRF2ServesThroughNodeLoss(t *testing.T) {
+	// Three nodes so every block still has a live replica after one dies.
+	lis := make([]net.Listener, 3)
+	servers := make([]*grpc.Server, 3)
+	nodes := map[string]string{}
+	for i := range servers {
+		var err error
+		lis[i], err = net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		servers[i] = grpc.NewServer()
+		pmv1.RegisterCacheNodeServiceServer(servers[i], cachenode.New(blockstore.NewLRU(1<<28)))
+		go servers[i].Serve(lis[i])
+		t.Cleanup(servers[i].Stop)
+		nodes[fmt.Sprintf("cn-%d", i)] = lis[i].Addr().String()
+	}
+	client := startGatewayRF(t, nodes, 2)
+	ctx := context.Background()
+
+	const blockSize = 4
+	tokens := []uint32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	ids := chain.Build("m", blockSize, tokens)
+
+	up, err := client.PutBlocks(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := chain.Root("m", blockSize)
+	for i, blk := range chain.Chunk(tokens, blockSize) {
+		if err := up.Send(&pmv1.PutBlocksRequest{Block: &pmv1.Block{
+			BlockId:    ids[i][:],
+			ParentId:   parent[:],
+			ModelId:    "m",
+			Payload:    []byte{7},
+			TokenCount: uint32(len(blk)),
+			CostUs:     100,
+		}}); err != nil {
+			t.Fatal(err)
+		}
+		parent = ids[i]
+	}
+	putResp, err := up.CloseAndRecv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Every block stored twice.
+	if putResp.Stored != uint32(2*len(ids)) {
+		t.Fatalf("stored %d replicas, want %d", putResp.Stored, 2*len(ids))
+	}
+
+	// Kill each node in turn (restore is impossible with gRPC Stop, so test
+	// one loss: node 0).
+	servers[0].Stop()
+	resp, err := client.Match(ctx, &pmv1.MatchRequest{ModelId: "m", Chain: rawChain(ids)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if int(resp.MatchedDepth) != len(ids) {
+		t.Fatalf("matched %d/%d with one node down — replica failover broken",
+			resp.MatchedDepth, len(ids))
+	}
+	// Refs must not point at the dead node.
+	for _, ref := range resp.Refs {
+		if ref.NodeAddr == lis[0].Addr().String() {
+			t.Fatalf("ref points at the dead node %s", ref.NodeAddr)
+		}
 	}
 }
 

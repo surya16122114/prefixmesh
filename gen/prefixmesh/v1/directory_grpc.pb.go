@@ -24,6 +24,7 @@ const (
 	DirectoryService_Heartbeat_FullMethodName = "/prefixmesh.v1.DirectoryService/Heartbeat"
 	DirectoryService_WatchRing_FullMethodName = "/prefixmesh.v1.DirectoryService/WatchRing"
 	DirectoryService_GetRing_FullMethodName   = "/prefixmesh.v1.DirectoryService/GetRing"
+	DirectoryService_Suspect_FullMethodName   = "/prefixmesh.v1.DirectoryService/Suspect"
 	DirectoryService_Prepare_FullMethodName   = "/prefixmesh.v1.DirectoryService/Prepare"
 	DirectoryService_Accept_FullMethodName    = "/prefixmesh.v1.DirectoryService/Accept"
 	DirectoryService_Learn_FullMethodName     = "/prefixmesh.v1.DirectoryService/Learn"
@@ -46,6 +47,11 @@ type DirectoryServiceClient interface {
 	// committed ring epoch. On (re)connect the current ring is sent first.
 	WatchRing(ctx context.Context, in *WatchRingRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Ring], error)
 	GetRing(ctx context.Context, in *GetRingRequest, opts ...grpc.CallOption) (*Ring, error)
+	// Suspicion exchange: before proposing NodeDead, a replica asks its peers
+	// whether they also stopped hearing from the node. Only a majority of
+	// suspecting replicas (self included) may propose — one replica's network
+	// blip can no longer evict a healthy node.
+	Suspect(ctx context.Context, in *SuspectRequest, opts ...grpc.CallOption) (*SuspectResponse, error)
 	// --- replica-internal Paxos RPCs ---
 	Prepare(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*PrepareResponse, error)
 	Accept(ctx context.Context, in *AcceptRequest, opts ...grpc.CallOption) (*AcceptResponse, error)
@@ -119,6 +125,16 @@ func (c *directoryServiceClient) GetRing(ctx context.Context, in *GetRingRequest
 	return out, nil
 }
 
+func (c *directoryServiceClient) Suspect(ctx context.Context, in *SuspectRequest, opts ...grpc.CallOption) (*SuspectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SuspectResponse)
+	err := c.cc.Invoke(ctx, DirectoryService_Suspect_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *directoryServiceClient) Prepare(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*PrepareResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PrepareResponse)
@@ -166,6 +182,11 @@ type DirectoryServiceServer interface {
 	// committed ring epoch. On (re)connect the current ring is sent first.
 	WatchRing(*WatchRingRequest, grpc.ServerStreamingServer[Ring]) error
 	GetRing(context.Context, *GetRingRequest) (*Ring, error)
+	// Suspicion exchange: before proposing NodeDead, a replica asks its peers
+	// whether they also stopped hearing from the node. Only a majority of
+	// suspecting replicas (self included) may propose — one replica's network
+	// blip can no longer evict a healthy node.
+	Suspect(context.Context, *SuspectRequest) (*SuspectResponse, error)
 	// --- replica-internal Paxos RPCs ---
 	Prepare(context.Context, *PrepareRequest) (*PrepareResponse, error)
 	Accept(context.Context, *AcceptRequest) (*AcceptResponse, error)
@@ -194,6 +215,9 @@ func (UnimplementedDirectoryServiceServer) WatchRing(*WatchRingRequest, grpc.Ser
 }
 func (UnimplementedDirectoryServiceServer) GetRing(context.Context, *GetRingRequest) (*Ring, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRing not implemented")
+}
+func (UnimplementedDirectoryServiceServer) Suspect(context.Context, *SuspectRequest) (*SuspectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Suspect not implemented")
 }
 func (UnimplementedDirectoryServiceServer) Prepare(context.Context, *PrepareRequest) (*PrepareResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Prepare not implemented")
@@ -308,6 +332,24 @@ func _DirectoryService_GetRing_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DirectoryService_Suspect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SuspectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DirectoryServiceServer).Suspect(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DirectoryService_Suspect_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DirectoryServiceServer).Suspect(ctx, req.(*SuspectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DirectoryService_Prepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PrepareRequest)
 	if err := dec(in); err != nil {
@@ -384,6 +426,10 @@ var DirectoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRing",
 			Handler:    _DirectoryService_GetRing_Handler,
+		},
+		{
+			MethodName: "Suspect",
+			Handler:    _DirectoryService_Suspect_Handler,
 		},
 		{
 			MethodName: "Prepare",

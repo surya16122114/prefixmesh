@@ -57,16 +57,37 @@ func New(epoch uint64, nodes map[string]string, vnodesPerNode int) *Ring {
 // Owner returns the node owning a block ID, walking clockwise from the key's
 // point. ok is false on an empty ring.
 func (r *Ring) Owner(blockID []byte) (nodeID, addr string, ok bool) {
-	if len(r.vnodes) == 0 {
+	owners := r.Owners(blockID, 1)
+	if len(owners) == 0 {
 		return "", "", false
+	}
+	return owners[0], r.addrs[owners[0]], true
+}
+
+// Owners returns up to n distinct nodes for a block ID: the clockwise owner
+// followed by successor nodes. Replicas (RF>1) live on the successors, so a
+// membership change shifts at most one member of the owner set — the other
+// keeps serving through the transition.
+func (r *Ring) Owners(blockID []byte, n int) []string {
+	if len(r.vnodes) == 0 || n <= 0 {
+		return nil
+	}
+	if n > len(r.addrs) {
+		n = len(r.addrs)
 	}
 	key := binary.BigEndian.Uint64(blockID[:8]) // chain hashes are uniform; reuse prefix
 	i := sort.Search(len(r.vnodes), func(i int) bool { return r.vnodes[i].point >= key })
-	if i == len(r.vnodes) {
-		i = 0 // wrap
+	out := make([]string, 0, n)
+	seen := make(map[string]struct{}, n)
+	for scanned := 0; scanned < len(r.vnodes) && len(out) < n; scanned++ {
+		id := r.vnodes[(i+scanned)%len(r.vnodes)].nodeID
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
 	}
-	id := r.vnodes[i].nodeID
-	return id, r.addrs[id], true
+	return out
 }
 
 func (r *Ring) Nodes() map[string]string {

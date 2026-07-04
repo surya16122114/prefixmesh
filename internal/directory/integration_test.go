@@ -113,7 +113,7 @@ func startGatewayM1(t *testing.T, ctx context.Context, dirs []string) pmv1.Gatew
 		t.Fatal(err)
 	}
 	g := grpc.NewServer()
-	pmv1.RegisterGatewayServiceServer(g, gateway.New(w))
+	pmv1.RegisterGatewayServiceServer(g, gateway.New(w, 1))
 	go g.Serve(lis)
 	t.Cleanup(g.Stop)
 

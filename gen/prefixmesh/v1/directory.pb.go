@@ -365,6 +365,94 @@ func (*GetRingRequest) Descriptor() ([]byte, []int) {
 	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{7}
 }
 
+type SuspectRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuspectRequest) Reset() {
+	*x = SuspectRequest{}
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuspectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuspectRequest) ProtoMessage() {}
+
+func (x *SuspectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuspectRequest.ProtoReflect.Descriptor instead.
+func (*SuspectRequest) Descriptor() ([]byte, []int) {
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SuspectRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+type SuspectResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Suspect       bool                   `protobuf:"varint,1,opt,name=suspect,proto3" json:"suspect,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuspectResponse) Reset() {
+	*x = SuspectResponse{}
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuspectResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuspectResponse) ProtoMessage() {}
+
+func (x *SuspectResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuspectResponse.ProtoReflect.Descriptor instead.
+func (*SuspectResponse) Descriptor() ([]byte, []int) {
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SuspectResponse) GetSuspect() bool {
+	if x != nil {
+		return x.Suspect
+	}
+	return false
+}
+
 // Commands agreed via Paxos, applied in log order to the cluster state machine.
 type ClusterCommand struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -383,7 +471,7 @@ type ClusterCommand struct {
 
 func (x *ClusterCommand) Reset() {
 	*x = ClusterCommand{}
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[8]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -395,7 +483,7 @@ func (x *ClusterCommand) String() string {
 func (*ClusterCommand) ProtoMessage() {}
 
 func (x *ClusterCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[8]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -408,7 +496,7 @@ func (x *ClusterCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClusterCommand.ProtoReflect.Descriptor instead.
 func (*ClusterCommand) Descriptor() ([]byte, []int) {
-	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{8}
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ClusterCommand) GetCmd() isClusterCommand_Cmd {
@@ -530,7 +618,7 @@ type RebalanceLease struct {
 
 func (x *RebalanceLease) Reset() {
 	*x = RebalanceLease{}
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[9]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -542,7 +630,7 @@ func (x *RebalanceLease) String() string {
 func (*RebalanceLease) ProtoMessage() {}
 
 func (x *RebalanceLease) ProtoReflect() protoreflect.Message {
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[9]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -555,7 +643,7 @@ func (x *RebalanceLease) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RebalanceLease.ProtoReflect.Descriptor instead.
 func (*RebalanceLease) Descriptor() ([]byte, []int) {
-	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{9}
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RebalanceLease) GetLeaseId() string {
@@ -603,7 +691,7 @@ type PrepareRequest struct {
 
 func (x *PrepareRequest) Reset() {
 	*x = PrepareRequest{}
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[10]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -615,7 +703,7 @@ func (x *PrepareRequest) String() string {
 func (*PrepareRequest) ProtoMessage() {}
 
 func (x *PrepareRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[10]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -628,7 +716,7 @@ func (x *PrepareRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareRequest.ProtoReflect.Descriptor instead.
 func (*PrepareRequest) Descriptor() ([]byte, []int) {
-	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{10}
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *PrepareRequest) GetSlot() uint64 {
@@ -657,7 +745,7 @@ type PrepareResponse struct {
 
 func (x *PrepareResponse) Reset() {
 	*x = PrepareResponse{}
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[11]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -669,7 +757,7 @@ func (x *PrepareResponse) String() string {
 func (*PrepareResponse) ProtoMessage() {}
 
 func (x *PrepareResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[11]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -682,7 +770,7 @@ func (x *PrepareResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareResponse.ProtoReflect.Descriptor instead.
 func (*PrepareResponse) Descriptor() ([]byte, []int) {
-	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{11}
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *PrepareResponse) GetPromised() bool {
@@ -724,7 +812,7 @@ type AcceptRequest struct {
 
 func (x *AcceptRequest) Reset() {
 	*x = AcceptRequest{}
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[12]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -736,7 +824,7 @@ func (x *AcceptRequest) String() string {
 func (*AcceptRequest) ProtoMessage() {}
 
 func (x *AcceptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[12]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -749,7 +837,7 @@ func (x *AcceptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptRequest.ProtoReflect.Descriptor instead.
 func (*AcceptRequest) Descriptor() ([]byte, []int) {
-	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{12}
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AcceptRequest) GetSlot() uint64 {
@@ -783,7 +871,7 @@ type AcceptResponse struct {
 
 func (x *AcceptResponse) Reset() {
 	*x = AcceptResponse{}
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[13]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -795,7 +883,7 @@ func (x *AcceptResponse) String() string {
 func (*AcceptResponse) ProtoMessage() {}
 
 func (x *AcceptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[13]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -808,7 +896,7 @@ func (x *AcceptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptResponse.ProtoReflect.Descriptor instead.
 func (*AcceptResponse) Descriptor() ([]byte, []int) {
-	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{13}
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AcceptResponse) GetAccepted() bool {
@@ -835,7 +923,7 @@ type LearnRequest struct {
 
 func (x *LearnRequest) Reset() {
 	*x = LearnRequest{}
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[14]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -847,7 +935,7 @@ func (x *LearnRequest) String() string {
 func (*LearnRequest) ProtoMessage() {}
 
 func (x *LearnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[14]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -860,7 +948,7 @@ func (x *LearnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LearnRequest.ProtoReflect.Descriptor instead.
 func (*LearnRequest) Descriptor() ([]byte, []int) {
-	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{14}
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *LearnRequest) GetSlot() uint64 {
@@ -885,7 +973,7 @@ type LearnResponse struct {
 
 func (x *LearnResponse) Reset() {
 	*x = LearnResponse{}
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[15]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -897,7 +985,7 @@ func (x *LearnResponse) String() string {
 func (*LearnResponse) ProtoMessage() {}
 
 func (x *LearnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_prefixmesh_v1_directory_proto_msgTypes[15]
+	mi := &file_prefixmesh_v1_directory_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -910,7 +998,7 @@ func (x *LearnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LearnResponse.ProtoReflect.Descriptor instead.
 func (*LearnResponse) Descriptor() ([]byte, []int) {
-	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{15}
+	return file_prefixmesh_v1_directory_proto_rawDescGZIP(), []int{17}
 }
 
 var File_prefixmesh_v1_directory_proto protoreflect.FileDescriptor
@@ -934,7 +1022,11 @@ const file_prefixmesh_v1_directory_proto_rawDesc = "" +
 	"\x10WatchRingRequest\x12\x1f\n" +
 	"\vknown_epoch\x18\x01 \x01(\x04R\n" +
 	"knownEpoch\"\x10\n" +
-	"\x0eGetRingRequest\"\x8e\x02\n" +
+	"\x0eGetRingRequest\")\n" +
+	"\x0eSuspectRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"+\n" +
+	"\x0fSuspectResponse\x12\x18\n" +
+	"\asuspect\x18\x01 \x01(\bR\asuspect\"\x8e\x02\n" +
 	"\x0eClusterCommand\x126\n" +
 	"\tnode_join\x18\x01 \x01(\v2\x17.prefixmesh.v1.NodeInfoH\x00R\bnodeJoin\x12\x1f\n" +
 	"\n" +
@@ -970,13 +1062,14 @@ const file_prefixmesh_v1_directory_proto_rawDesc = "" +
 	"\fLearnRequest\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x123\n" +
 	"\x05value\x18\x02 \x01(\v2\x1d.prefixmesh.v1.ClusterCommandR\x05value\"\x0f\n" +
-	"\rLearnResponse2\xc0\x04\n" +
+	"\rLearnResponse2\x8a\x05\n" +
 	"\x10DirectoryService\x12?\n" +
 	"\x04Join\x12\x1a.prefixmesh.v1.JoinRequest\x1a\x1b.prefixmesh.v1.JoinResponse\x12B\n" +
 	"\x05Leave\x12\x1b.prefixmesh.v1.LeaveRequest\x1a\x1c.prefixmesh.v1.LeaveResponse\x12N\n" +
 	"\tHeartbeat\x12\x1f.prefixmesh.v1.HeartbeatRequest\x1a .prefixmesh.v1.HeartbeatResponse\x12C\n" +
 	"\tWatchRing\x12\x1f.prefixmesh.v1.WatchRingRequest\x1a\x13.prefixmesh.v1.Ring0\x01\x12=\n" +
 	"\aGetRing\x12\x1d.prefixmesh.v1.GetRingRequest\x1a\x13.prefixmesh.v1.Ring\x12H\n" +
+	"\aSuspect\x12\x1d.prefixmesh.v1.SuspectRequest\x1a\x1e.prefixmesh.v1.SuspectResponse\x12H\n" +
 	"\aPrepare\x12\x1d.prefixmesh.v1.PrepareRequest\x1a\x1e.prefixmesh.v1.PrepareResponse\x12E\n" +
 	"\x06Accept\x12\x1c.prefixmesh.v1.AcceptRequest\x1a\x1d.prefixmesh.v1.AcceptResponse\x12B\n" +
 	"\x05Learn\x12\x1b.prefixmesh.v1.LearnRequest\x1a\x1c.prefixmesh.v1.LearnResponseBDZBgithub.com/surya16122114/prefixmesh/gen/prefixmesh/v1;prefixmeshv1b\x06proto3"
@@ -993,7 +1086,7 @@ func file_prefixmesh_v1_directory_proto_rawDescGZIP() []byte {
 	return file_prefixmesh_v1_directory_proto_rawDescData
 }
 
-var file_prefixmesh_v1_directory_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_prefixmesh_v1_directory_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_prefixmesh_v1_directory_proto_goTypes = []any{
 	(*JoinRequest)(nil),       // 0: prefixmesh.v1.JoinRequest
 	(*JoinResponse)(nil),      // 1: prefixmesh.v1.JoinResponse
@@ -1003,43 +1096,47 @@ var file_prefixmesh_v1_directory_proto_goTypes = []any{
 	(*HeartbeatResponse)(nil), // 5: prefixmesh.v1.HeartbeatResponse
 	(*WatchRingRequest)(nil),  // 6: prefixmesh.v1.WatchRingRequest
 	(*GetRingRequest)(nil),    // 7: prefixmesh.v1.GetRingRequest
-	(*ClusterCommand)(nil),    // 8: prefixmesh.v1.ClusterCommand
-	(*RebalanceLease)(nil),    // 9: prefixmesh.v1.RebalanceLease
-	(*PrepareRequest)(nil),    // 10: prefixmesh.v1.PrepareRequest
-	(*PrepareResponse)(nil),   // 11: prefixmesh.v1.PrepareResponse
-	(*AcceptRequest)(nil),     // 12: prefixmesh.v1.AcceptRequest
-	(*AcceptResponse)(nil),    // 13: prefixmesh.v1.AcceptResponse
-	(*LearnRequest)(nil),      // 14: prefixmesh.v1.LearnRequest
-	(*LearnResponse)(nil),     // 15: prefixmesh.v1.LearnResponse
-	(*NodeInfo)(nil),          // 16: prefixmesh.v1.NodeInfo
-	(*Ring)(nil),              // 17: prefixmesh.v1.Ring
+	(*SuspectRequest)(nil),    // 8: prefixmesh.v1.SuspectRequest
+	(*SuspectResponse)(nil),   // 9: prefixmesh.v1.SuspectResponse
+	(*ClusterCommand)(nil),    // 10: prefixmesh.v1.ClusterCommand
+	(*RebalanceLease)(nil),    // 11: prefixmesh.v1.RebalanceLease
+	(*PrepareRequest)(nil),    // 12: prefixmesh.v1.PrepareRequest
+	(*PrepareResponse)(nil),   // 13: prefixmesh.v1.PrepareResponse
+	(*AcceptRequest)(nil),     // 14: prefixmesh.v1.AcceptRequest
+	(*AcceptResponse)(nil),    // 15: prefixmesh.v1.AcceptResponse
+	(*LearnRequest)(nil),      // 16: prefixmesh.v1.LearnRequest
+	(*LearnResponse)(nil),     // 17: prefixmesh.v1.LearnResponse
+	(*NodeInfo)(nil),          // 18: prefixmesh.v1.NodeInfo
+	(*Ring)(nil),              // 19: prefixmesh.v1.Ring
 }
 var file_prefixmesh_v1_directory_proto_depIdxs = []int32{
-	16, // 0: prefixmesh.v1.JoinRequest.node:type_name -> prefixmesh.v1.NodeInfo
-	17, // 1: prefixmesh.v1.JoinResponse.ring:type_name -> prefixmesh.v1.Ring
-	16, // 2: prefixmesh.v1.ClusterCommand.node_join:type_name -> prefixmesh.v1.NodeInfo
-	9,  // 3: prefixmesh.v1.ClusterCommand.lease_grant:type_name -> prefixmesh.v1.RebalanceLease
-	8,  // 4: prefixmesh.v1.PrepareResponse.accepted_value:type_name -> prefixmesh.v1.ClusterCommand
-	8,  // 5: prefixmesh.v1.AcceptRequest.value:type_name -> prefixmesh.v1.ClusterCommand
-	8,  // 6: prefixmesh.v1.LearnRequest.value:type_name -> prefixmesh.v1.ClusterCommand
+	18, // 0: prefixmesh.v1.JoinRequest.node:type_name -> prefixmesh.v1.NodeInfo
+	19, // 1: prefixmesh.v1.JoinResponse.ring:type_name -> prefixmesh.v1.Ring
+	18, // 2: prefixmesh.v1.ClusterCommand.node_join:type_name -> prefixmesh.v1.NodeInfo
+	11, // 3: prefixmesh.v1.ClusterCommand.lease_grant:type_name -> prefixmesh.v1.RebalanceLease
+	10, // 4: prefixmesh.v1.PrepareResponse.accepted_value:type_name -> prefixmesh.v1.ClusterCommand
+	10, // 5: prefixmesh.v1.AcceptRequest.value:type_name -> prefixmesh.v1.ClusterCommand
+	10, // 6: prefixmesh.v1.LearnRequest.value:type_name -> prefixmesh.v1.ClusterCommand
 	0,  // 7: prefixmesh.v1.DirectoryService.Join:input_type -> prefixmesh.v1.JoinRequest
 	2,  // 8: prefixmesh.v1.DirectoryService.Leave:input_type -> prefixmesh.v1.LeaveRequest
 	4,  // 9: prefixmesh.v1.DirectoryService.Heartbeat:input_type -> prefixmesh.v1.HeartbeatRequest
 	6,  // 10: prefixmesh.v1.DirectoryService.WatchRing:input_type -> prefixmesh.v1.WatchRingRequest
 	7,  // 11: prefixmesh.v1.DirectoryService.GetRing:input_type -> prefixmesh.v1.GetRingRequest
-	10, // 12: prefixmesh.v1.DirectoryService.Prepare:input_type -> prefixmesh.v1.PrepareRequest
-	12, // 13: prefixmesh.v1.DirectoryService.Accept:input_type -> prefixmesh.v1.AcceptRequest
-	14, // 14: prefixmesh.v1.DirectoryService.Learn:input_type -> prefixmesh.v1.LearnRequest
-	1,  // 15: prefixmesh.v1.DirectoryService.Join:output_type -> prefixmesh.v1.JoinResponse
-	3,  // 16: prefixmesh.v1.DirectoryService.Leave:output_type -> prefixmesh.v1.LeaveResponse
-	5,  // 17: prefixmesh.v1.DirectoryService.Heartbeat:output_type -> prefixmesh.v1.HeartbeatResponse
-	17, // 18: prefixmesh.v1.DirectoryService.WatchRing:output_type -> prefixmesh.v1.Ring
-	17, // 19: prefixmesh.v1.DirectoryService.GetRing:output_type -> prefixmesh.v1.Ring
-	11, // 20: prefixmesh.v1.DirectoryService.Prepare:output_type -> prefixmesh.v1.PrepareResponse
-	13, // 21: prefixmesh.v1.DirectoryService.Accept:output_type -> prefixmesh.v1.AcceptResponse
-	15, // 22: prefixmesh.v1.DirectoryService.Learn:output_type -> prefixmesh.v1.LearnResponse
-	15, // [15:23] is the sub-list for method output_type
-	7,  // [7:15] is the sub-list for method input_type
+	8,  // 12: prefixmesh.v1.DirectoryService.Suspect:input_type -> prefixmesh.v1.SuspectRequest
+	12, // 13: prefixmesh.v1.DirectoryService.Prepare:input_type -> prefixmesh.v1.PrepareRequest
+	14, // 14: prefixmesh.v1.DirectoryService.Accept:input_type -> prefixmesh.v1.AcceptRequest
+	16, // 15: prefixmesh.v1.DirectoryService.Learn:input_type -> prefixmesh.v1.LearnRequest
+	1,  // 16: prefixmesh.v1.DirectoryService.Join:output_type -> prefixmesh.v1.JoinResponse
+	3,  // 17: prefixmesh.v1.DirectoryService.Leave:output_type -> prefixmesh.v1.LeaveResponse
+	5,  // 18: prefixmesh.v1.DirectoryService.Heartbeat:output_type -> prefixmesh.v1.HeartbeatResponse
+	19, // 19: prefixmesh.v1.DirectoryService.WatchRing:output_type -> prefixmesh.v1.Ring
+	19, // 20: prefixmesh.v1.DirectoryService.GetRing:output_type -> prefixmesh.v1.Ring
+	9,  // 21: prefixmesh.v1.DirectoryService.Suspect:output_type -> prefixmesh.v1.SuspectResponse
+	13, // 22: prefixmesh.v1.DirectoryService.Prepare:output_type -> prefixmesh.v1.PrepareResponse
+	15, // 23: prefixmesh.v1.DirectoryService.Accept:output_type -> prefixmesh.v1.AcceptResponse
+	17, // 24: prefixmesh.v1.DirectoryService.Learn:output_type -> prefixmesh.v1.LearnResponse
+	16, // [16:25] is the sub-list for method output_type
+	7,  // [7:16] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -1051,7 +1148,7 @@ func file_prefixmesh_v1_directory_proto_init() {
 		return
 	}
 	file_prefixmesh_v1_common_proto_init()
-	file_prefixmesh_v1_directory_proto_msgTypes[8].OneofWrappers = []any{
+	file_prefixmesh_v1_directory_proto_msgTypes[10].OneofWrappers = []any{
 		(*ClusterCommand_NodeJoin)(nil),
 		(*ClusterCommand_NodeLeave)(nil),
 		(*ClusterCommand_NodeDead)(nil),
@@ -1065,7 +1162,7 @@ func file_prefixmesh_v1_directory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_prefixmesh_v1_directory_proto_rawDesc), len(file_prefixmesh_v1_directory_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
