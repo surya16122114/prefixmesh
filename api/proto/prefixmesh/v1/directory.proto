@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package prefixmesh.v1;
+
+import "prefixmesh/v1/common.proto";
+
+option go_package = "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1;prefixmeshv1";
+
+// Control plane. 3–5 replicas run multi-decree Paxos over a log of
+// ClusterCommands; the replicated state machine yields the authoritative
+// epoch->ring mapping. Design ported from distributed-kv-store's
+// PaxosCoordinator/Membership (Java), reimplemented in Go.
+service DirectoryService {
+  // --- fleet-facing ---
+  rpc Join(JoinRequest) returns (JoinResponse);
+  rpc Leave(LeaveRequest) returns (LeaveResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // Gateways and cache nodes hold this stream open; each message is a newly
+  // committed ring epoch. On (re)connect the current ring is sent first.
+  rpc WatchRing(WatchRingRequest) returns (stream Ring);
+
+  rpc GetRing(GetRingRequest) returns (Ring);
+
+  // --- replica-internal Paxos RPCs ---
+  rpc Prepare(PrepareRequest) returns (PrepareResponse);
+  rpc Accept(AcceptRequest) returns (AcceptResponse);
+  rpc Learn(LearnRequest) returns (LearnResponse);
+}
+
+message JoinRequest { NodeInfo node = 1; }
+message JoinResponse { Ring ring = 1; }
+
+message LeaveRequest { string node_id = 1; }
+message LeaveResponse {}
+
+message HeartbeatRequest {
+  string node_id = 1;
+  uint64 occupancy_bytes = 2;
+  uint64 ring_epoch = 3;  // lets the directory detect stragglers
+}
+message HeartbeatResponse {}
+
+message WatchRingRequest { uint64 known_epoch = 1; }
+message GetRingRequest {}
+
+// Commands agreed via Paxos, applied in log order to the cluster state machine.
+message ClusterCommand {
+  oneof cmd {
+    NodeInfo node_join = 1;
+    string node_leave = 2;          // node_id, graceful
+    string node_dead = 3;           // node_id, quorum-suspected
+    RebalanceLease lease_grant = 4;
+    string lease_release = 5;       // lease_id
+  }
+}
+
+// Lets the previous owner of a keyspace range keep serving reads for a grace
+// period after an epoch change, so joins don't cause miss storms.
+message RebalanceLease {
+  string lease_id = 1;
+  string old_owner = 2;
+  string new_owner = 3;
+  uint64 from_epoch = 4;
+  int64 expires_unix_ms = 5;
+}
+
+// --- Paxos messages (single-decree per log slot; slot = log index) ---
+
+message PrepareRequest {
+  uint64 slot = 1;
+  uint64 ballot = 2;
+}
+message PrepareResponse {
+  bool promised = 1;
+  uint64 accepted_ballot = 2;
+  ClusterCommand accepted_value = 3;  // set iff a value was previously accepted
+}
+
+message AcceptRequest {
+  uint64 slot = 1;
+  uint64 ballot = 2;
+  ClusterCommand value = 3;
+}
+message AcceptResponse {
+  bool accepted = 1;
+  uint64 promised_ballot = 2;  // on reject: what we're promised to
+}
+
+message LearnRequest {
+  uint64 slot = 1;
+  ClusterCommand value = 2;
+}
+message LearnResponse {}

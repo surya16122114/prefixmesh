@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package prefixmesh.v1;
+
+option go_package = "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1;prefixmeshv1";
+
+// Kafka payload schemas (protobuf-encoded values; keys are raw bytes noted below).
+// The event plane is lossy by contract: nothing correctness-bearing rides on it.
+
+// Topic: prefix.access.v1 — key = chain head h_1 (keeps a prefix family's
+// events ordered within one partition). Producer: gateway (acks=0, buffered).
+// Consumers: prefetcher; (M4) eviction learner.
+message AccessEvent {
+  bytes chain_head = 1;       // h_1
+  string model_id = 2;
+  uint32 depth_requested = 3; // chain length in the Match
+  uint32 depth_matched = 4;   // hits
+  bytes deepest_hit = 5;      // block_id at matched depth (Markov state)
+  bytes next_miss = 6;        // first missed block_id, empty if full hit
+  int64 ts_unix_ms = 7;
+}
+
+// Topic: cache.warm.v1 — key = target block_id (routes to the partition set
+// consumed by the block's owner). Producer: prefetcher. Consumer: cache nodes.
+// Idempotent: warming a present block is a no-op.
+message WarmCommand {
+  bytes block_id = 1;
+  bytes parent_id = 2;
+  string model_id = 3;
+  string source_node = 4;    // peer to fetch from; empty => RECOMPUTE (skip in sim)
+  float confidence = 5;      // model P(child|state), for effectiveness accounting
+  int64 deadline_unix_ms = 6; // drop stale commands instead of warming cold trails
+}
+
+// Topic: cache.telemetry.v1 — key = node_id. Producer: cache nodes.
+message NodeTelemetry {
+  string node_id = 1;
+  uint64 occupancy_bytes = 2;
+  uint64 capacity_bytes = 3;
+  uint64 hits = 4;            // deltas since last event
+  uint64 misses = 5;
+  uint64 evictions = 6;
+  uint64 evicted_cost_us = 7; // prefill cost thrown away — eviction-quality signal
+  int64 ts_unix_ms = 8;
+}

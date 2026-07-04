@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package prefixmesh.v1;
+
+import "prefixmesh/v1/common.proto";
+
+option go_package = "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1;prefixmeshv1";
+
+// Client-facing API. Inference clients (or a vLLM/llama.cpp sidecar) call Match
+// before prefill and PutBlocks after prefill. Token IDs never leave the client;
+// only chain hashes travel.
+service GatewayService {
+  // Longest-prefix match: given the full hash chain of a prompt, return how deep
+  // the mesh can serve it and where each hit block lives.
+  rpc Match(MatchRequest) returns (MatchResponse);
+
+  // Write-back of freshly computed blocks. Idempotent: re-putting an existing
+  // block_id is a no-op (content addressing).
+  rpc PutBlocks(stream PutBlocksRequest) returns (PutBlocksResponse);
+}
+
+message MatchRequest {
+  string model_id = 1;
+  repeated bytes chain = 2;  // h_1..h_n, 32 bytes each, root-first
+}
+
+message MatchResponse {
+  // Blocks 1..matched_depth are cache hits; everything deeper is a guaranteed
+  // miss (the chain diverged). Client fetches hits directly from owner nodes.
+  uint32 matched_depth = 1;
+  repeated BlockRef refs = 2;  // refs for h_1..h_matched_depth, in order
+  uint64 ring_epoch = 3;
+}
+
+message PutBlocksRequest {
+  Block block = 1;
+}
+
+message PutBlocksResponse {
+  uint32 stored = 1;    // newly stored
+  uint32 existing = 2;  // already present (no-op)
+}

@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package prefixmesh.v1;
+
+option go_package = "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1;prefixmeshv1";
+
+// A content-addressed prefix-cache block. block_id is the chain hash
+// h_i = SHA-256(h_{i-1} || tokens_i); identity encodes the full prefix.
+message Block {
+  bytes block_id = 1;    // 32 bytes, chain hash
+  bytes parent_id = 2;   // 32 bytes, h_{i-1}; roots point at h_0
+  string model_id = 3;   // cache namespace
+  bytes payload = 4;     // simulated KV tensor
+  uint32 token_count = 5;
+  uint64 cost_us = 6;    // simulated prefill cost to recreate; eviction input
+}
+
+message BlockRef {
+  bytes block_id = 1;
+  string node_addr = 2;  // owner cache node host:port
+}
+
+// Ring epochs are the control plane's clock. Every data-plane request carries
+// the sender's epoch; a node that has seen a newer one rejects with WRONG_EPOCH.
+message RingEpoch {
+  uint64 epoch = 1;
+}
+
+message NodeInfo {
+  string node_id = 1;
+  string addr = 2;       // gRPC host:port
+  uint64 capacity_bytes = 3;
+}
+
+message Ring {
+  uint64 epoch = 1;
+  repeated NodeInfo nodes = 2;
+  uint32 vnodes_per_node = 3;
+}

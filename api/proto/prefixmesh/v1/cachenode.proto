@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package prefixmesh.v1;
+
+import "prefixmesh/v1/common.proto";
+
+option go_package = "github.com/surya16122114/prefixmesh/gen/prefixmesh/v1;prefixmeshv1";
+
+// Internal data-plane API of a cache node. Callers: gateways (Contains/Put),
+// inference clients (GetBlocks, via refs returned by Match), peer nodes
+// (GetBlocks during rebalance/warming).
+//
+// Epoch protocol: every request carries the caller's ring epoch. A node that has
+// committed a newer epoch fails the RPC with status FAILED_PRECONDITION and
+// details WrongEpoch{current}; the caller refreshes its ring and retries once.
+service CacheNodeService {
+  // Batched existence probe used by the gateway's longest-prefix search.
+  rpc Contains(ContainsRequest) returns (ContainsResponse);
+
+  rpc GetBlocks(GetBlocksRequest) returns (stream GetBlocksResponse);
+
+  // Idempotent by content address; a re-put acts as Touch.
+  rpc PutBlocks(stream CachePutRequest) returns (CachePutResponse);
+
+  // LRU bump without transferring payloads.
+  rpc Touch(TouchRequest) returns (TouchResponse);
+}
+
+message ContainsRequest {
+  uint64 ring_epoch = 1;
+  repeated bytes block_ids = 2;
+}
+
+message ContainsResponse {
+  repeated bool present = 1;  // parallel to block_ids
+}
+
+message GetBlocksRequest {
+  uint64 ring_epoch = 1;
+  repeated bytes block_ids = 2;
+}
+
+message GetBlocksResponse {
+  Block block = 1;
+}
+
+message CachePutRequest {
+  uint64 ring_epoch = 1;
+  Block block = 2;
+}
+
+message CachePutResponse {
+  uint32 stored = 1;
+  uint32 existing = 2;
+}
+
+message TouchRequest {
+  uint64 ring_epoch = 1;
+  repeated bytes block_ids = 2;
+}
+
+message TouchResponse {}
+
+message WrongEpoch {
+  uint64 current_epoch = 1;
+}
