@@ -12,11 +12,16 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.26"
+      # Toolchain pinned to what generated the checked-in code; a version skew
+      # shows up as spurious diffs in the drift check below.
+      - uses: arduino/setup-protoc@v3
+        with:
+          version: "35.1"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify generated protos are current
         run: |
-          sudo apt-get update && sudo apt-get install -y protobuf-compiler
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
           export PATH="$PATH:$(go env GOPATH)/bin"
           make proto
           git diff --exit-code gen/
