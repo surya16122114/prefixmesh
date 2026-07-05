@@ -7,4 +7,6 @@ RUN CGO_ENABLED=0 go build -o /out/ ./cmd/...
 
 FROM gcr.io/distroless/static-debian12
 COPY --from=build /out/ /bin/
-ENTRYPOINT ["/bin/gateway"]
+# No ENTRYPOINT: compose selects the binary per service via `command:`
+# (an entrypoint would prepend itself to every service's command).
+CMD ["/bin/gateway"]

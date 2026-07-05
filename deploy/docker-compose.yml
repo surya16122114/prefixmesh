@@ -25,15 +25,15 @@ services:
   directory-1: &directory
     build: ..
     command: ["/bin/directory", "--listen", ":7200", "--replica-id", "dir-1",
-              "--peers", "directory-2:7200,directory-3:7200"]
+              "--peers", "dir-2=directory-2:7200,dir-3=directory-3:7200"]
   directory-2:
     <<: *directory
     command: ["/bin/directory", "--listen", ":7200", "--replica-id", "dir-2",
-              "--peers", "directory-1:7200,directory-3:7200"]
+              "--peers", "dir-1=directory-1:7200,dir-3=directory-3:7200"]
   directory-3:
     <<: *directory
     command: ["/bin/directory", "--listen", ":7200", "--replica-id", "dir-3",
-              "--peers", "directory-1:7200,directory-2:7200"]
+              "--peers", "dir-1=directory-1:7200,dir-2=directory-2:7200"]
 
   cachenode-1: &cachenode
     build: ..
@@ -68,7 +68,8 @@ services:
     command: ["/bin/gateway", "--listen", ":7000", "--kafka", "kafka:9092",
               "--directory", "directory-1:7200,directory-2:7200,directory-3:7200"]
     ports:
-      - "7000:7000"
+      # host 7001: macOS AirPlay Receiver (ControlCenter) squats :7000
+      - "7001:7000"
     depends_on:
       - kafka
       - cachenode-1
